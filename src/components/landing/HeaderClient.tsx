@@ -65,7 +65,7 @@ export function HeaderClient({ navLinks }: HeaderClientProps) {
         isScrolled ? "bg-white/85 backdrop-blur-xl" : "bg-white"
       }`}
     >
-      <div className="mx-auto hidden h-16 w-full max-w-[1200px] items-center justify-between px-10 md:flex">
+      <div className="mx-auto hidden h-16 w-full max-w-[1454px] items-center justify-between px-10 md:flex">
         <LogoMark />
 
         <nav className="flex items-center gap-8 text-[15px] font-medium text-[#111827]" aria-label="Navegação principal">
@@ -96,7 +96,7 @@ export function HeaderClient({ navLinks }: HeaderClientProps) {
         </div>
       </div>
 
-      <div className="mx-auto flex h-16 w-full max-w-[1200px] items-center justify-between px-4 md:hidden">
+      <div className="mx-auto flex h-16 w-full max-w-[1454px] items-center justify-between px-4 md:hidden">
         <button
           ref={buttonRef}
           type="button"
@@ -115,7 +115,7 @@ export function HeaderClient({ navLinks }: HeaderClientProps) {
           to="/signup"
           className="rounded-full bg-[#0E9384] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#0B7F74] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E9384] focus-visible:ring-offset-2"
         >
-          Começar
+          Começar grátis
         </Link>
       </div>
 
@@ -145,6 +145,7 @@ export function HeaderClient({ navLinks }: HeaderClientProps) {
     </header>
   );
 }
+
 
 
 

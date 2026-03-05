@@ -1,4 +1,9 @@
-﻿import { ChartColumn, Sparkles } from "lucide-react";
+import {
+  BellRing,
+  ChartColumn,
+  ClipboardList,
+  LayoutDashboard,
+} from "lucide-react";
 import type { Step } from "../../data/landing";
 
 interface StepsSectionProps {
@@ -6,31 +11,150 @@ interface StepsSectionProps {
 }
 
 export function StepsSection({ steps }: StepsSectionProps) {
-  return (
-    <section className="bg-white px-5 py-16 md:px-10 md:py-24">
-      <div className="mx-auto w-full max-w-[1200px] text-center">
-        <span className="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-xs text-[#6B7280]">
-          <Sparkles className="h-3.5 w-3.5 text-[#0E9384]" />
-          Como funciona
-        </span>
-        <h2 className="mx-auto mt-4 max-w-[760px] text-3xl font-bold tracking-[-0.01em] text-[#0F0F14] md:text-5xl">
-          Simples de usar, poderoso na análise.
-        </h2>
+  const cards = [
+    {
+      id: steps[0]?.id ?? "01",
+      title: steps[0]?.title ?? "Escolha seu nivel",
+      description:
+        steps[0]?.description ??
+        "Voce comeca no modo iniciante ou intermediario e recebe a analise no nivel certo de linguagem.",
+      icon: ClipboardList,
+    },
+    {
+      id: steps[1]?.id ?? "02",
+      title: steps[1]?.title ?? "Selecione empresas",
+      description:
+        steps[1]?.description ??
+        "Adicione os ativos da sua watchlist e definimos o que precisa de atencao primeiro.",
+      icon: BellRing,
+    },
+    {
+      id: steps[2]?.id ?? "03",
+      title: steps[2]?.title ?? "Receba resumo + evidencias",
+      description:
+        steps[2]?.description ??
+        "Voce ve resumo em 60s, abre a evidencia oficial com um clique e entende sem virar analista.",
+      icon: ChartColumn,
+    },
+    {
+      id: "04",
+      title: "Veja tudo em uma tela so",
+      description: "Acompanhe mudancas, prioridade e fonte oficial no mesmo fluxo.",
+      icon: LayoutDashboard,
+    },
+  ];
 
-        <div className="relative mt-14 grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-8">
-          <div className="absolute left-0 right-0 top-8 hidden border-t border-dashed border-[#E5E7EB] md:block" />
-          {steps.map((step) => (
-            <article key={`step-${step.id}`} className="relative rounded-2xl border border-[#E8EAED] bg-white p-6 text-left">
-              <span className="absolute -top-7 left-4 text-5xl font-bold text-[#0E9384]/15">{step.id}</span>
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] bg-[#0E9384] text-white">
-                <ChartColumn className="h-5 w-5" />
-              </span>
-              <h3 className="mt-3 text-lg font-semibold text-[#0F0F14]">{step.title}</h3>
-              <p className="mt-2 text-sm leading-[1.6] text-[#6B7280]">{step.description}</p>
-            </article>
-          ))}
+  return (
+    <section id="como-funciona" className="bg-white px-5 py-16 md:px-10 md:py-24">
+      <div className="mx-auto w-full max-w-[1280px] px-[20px]">
+        <div
+          className="relative z-[1] flex w-full flex-col items-center gap-[20px] rounded-[24px] bg-white p-[30px] md:h-[808px]"
+          style={{ boxShadow: "0 0 64px 0 #FFFAF3" }}
+        >
+          <div className="text-center">
+          <span className="inline-flex items-center text-sm font-medium text-[#0E9384]">
+            Analise simplificada
+          </span>
+
+          <p
+            className="mx-auto mt-4 max-w-[760px]"
+            style={{
+              fontSize: "38px",
+              fontWeight: 600,
+              color: "#101727",
+              lineHeight: "100%",
+              letterSpacing: "-0.02em",
+              textWrap: "balance",
+            }}
+          >
+            Do caos de indicadores para clareza em minutos
+          </p>
+          </div>
+
+          <div className="mt-10 grid w-full grid-cols-1 gap-[20px] md:grid-cols-2 md:justify-items-center">
+          {cards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <article
+                key={`step-card-${card.id}`}
+                className="flex w-full max-w-[600px] items-center gap-3 rounded-[14px] border border-[rgba(14,147,132,0.09)] bg-white p-6 text-left md:h-[120px]"
+              >
+                <span className="inline-flex h-[70px] w-[70px] shrink-0 items-center justify-center rounded-[12px] bg-[#E8F6F4] text-[#0E9384]">
+                  <Icon className="h-8 w-8" />
+                </span>
+
+                <div>
+                  <p
+                    style={{
+                      color: "#101727",
+                      fontSize: "18px",
+                      lineHeight: "21.6px",
+                      letterSpacing: "-1px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {card.title}
+                  </p>
+                  <p
+                    className="mt-1"
+                    style={{
+                      color: "#7E7E7E",
+                      fontSize: "16px",
+                      fontWeight: 400,
+                      lineHeight: "20.8px",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {card.description}
+                  </p>
+                </div>
+              </article>
+            );
+          })}
+          </div>
+
+          <article className="mx-auto mt-6 flex flex-col items-start justify-center rounded-2xl border border-[#0B7F74] bg-[#0E9384] p-5 text-left md:h-[172px] md:w-[1220px] md:p-6">
+          <p
+            style={{
+              color: "#fff",
+              fontSize: "18px",
+              lineHeight: "21.6px",
+              letterSpacing: "-1px",
+              fontWeight: 600,
+            }}
+          >
+            Resumo em 60s com evidencias oficiais
+          </p>
+          <p className="mt-2 max-w-[880px]"
+            style={{
+              color: "rgba(255, 255, 255, 0.6)",
+              fontSize: "16px",
+              fontWeight: 400,
+              lineHeight: "20.8px",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Veja os principais sinais e riscos com contexto e abra a fonte CVM/B3/RI sem sair da tela.
+          </p>
+          </article>
         </div>
       </div>
     </section>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

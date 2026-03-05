@@ -5,7 +5,7 @@ import { LogoMark } from "./LogoMark";
 export function FooterSection() {
   return (
     <footer className="border-t border-[#E8EAED] bg-white px-5 pb-8 pt-12 md:px-10">
-      <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 gap-10 md:grid-cols-4">
+      <div className="mx-auto grid w-full max-w-[1454px] grid-cols-1 gap-10 md:grid-cols-4">
         <div>
           <LogoMark />
           <p className="mt-2 max-w-[220px] text-sm text-[#6B7280]">Inteligência financeira para investidores brasileiros.</p>
@@ -64,12 +64,13 @@ export function FooterSection() {
         </div>
       </div>
 
-      <div className="mx-auto mt-10 flex w-full max-w-[1200px] flex-col items-start justify-between gap-2 border-t border-[#F3F4F6] pt-5 text-xs text-[#6B7280] md:flex-row md:items-center">
+      <div className="mx-auto mt-10 flex w-full max-w-[1454px] flex-col items-start justify-between gap-2 border-t border-[#F3F4F6] pt-5 text-xs text-[#6B7280] md:flex-row md:items-center">
         <p>© 2026 Analiso. Todos os direitos reservados.</p>
         <p>Dados: CVM / B3 / RI</p>
       </div>
     </footer>
   );
 }
+
 
 

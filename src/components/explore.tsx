@@ -1052,7 +1052,7 @@ export function ExplorePage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {entryPoints.map((entry) => (
+                  {thesisCollections.map((entry) => (
                     <button
                       key={entry}
                       onClick={() => toggleEntryPoint(entry)}

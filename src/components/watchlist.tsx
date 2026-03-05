@@ -400,7 +400,7 @@ export function WatchlistPage() {
   const [activeRange, setActiveRange] = useState<"7d" | "30d" | "90d">("30d");
   const [activePillars, setActivePillars] = useState<Pillar[]>([]);
   const [severityFilter, setSeverityFilter] = useState<"Todos" | "Risco" | "Atenção" | "Saudável">("Todos");
-  const [sourceFilter, setSourceFilter] = useState<"Todas" | "CVM" | "RI">("Todas");
+  const [sourceFilter, setSourceFilter] = useState<"Todas" | "CVM" | "B3" | "RI">("Todas");
   const [listSearch, setListSearch] = useState("");
   const [sortBy, setSortBy] = useState("Mudou recentemente");
   const [filters, setFilters] = useState({
@@ -420,7 +420,7 @@ export function WatchlistPage() {
   const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
   const [quickActionsTicker, setQuickActionsTicker] = useState<string | null>(null);
 
-  const uiState: "ready" | "loading" | "empty" = "ready";
+  const [uiState] = useState<"ready" | "loading" | "empty">("ready");
 
   const staleCompanies = watchlistCompanies.filter((company) => company.freshness === "Desatualizado");
   const staleCompaniesCount = staleCompanies.length;
@@ -1384,7 +1384,6 @@ export function WatchlistPage() {
 }
 
 export default WatchlistPage;
-
 
 
 

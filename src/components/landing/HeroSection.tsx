@@ -1,73 +1,95 @@
 ﻿import { Link } from "react-router-dom";
-import { CirclePlay, Sparkles, Star } from "lucide-react";
-import { HeroChart } from "./HeroChart";
+import { Search } from "lucide-react";
+import type { NavLink } from "../../data/landing";
+import { HeaderClient } from "./HeaderClient";
 
-export function HeroSection() {
+interface HeroSectionProps {
+  navLinks: NavLink[];
+}
+
+export function HeroSection({ navLinks }: HeroSectionProps) {
   return (
-    <section
-      id="inicio"
-      className="mx-auto flex w-full max-w-[1200px] flex-col gap-10 px-5 pb-16 pt-12 md:flex-row md:items-center md:px-10 md:pb-20 md:pt-20"
-    >
-      <div className="w-full md:w-[45%]">
-        <span className="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-xs text-[#6B7280]">
-          <Sparkles className="h-3.5 w-3.5 text-[#0E9384]" />
-          Inteligência para seus investimentos
-        </span>
-
-        <h1 className="mt-5 text-4xl font-extrabold leading-[1.1] tracking-[-0.02em] text-[#0F0F14] md:text-6xl">
-          Monitore sua watchlist.
-          <br />
-          Tome decisões melhores.
-        </h1>
-
-        <p className="mt-6 max-w-[420px] text-base leading-[1.65] text-[#6B7280]">
-          Acompanhe indicadores financeiros de empresas B3 com dados da CVM, B3 e RI. Alertas, evidências e contexto,
-          tudo em um lugar.
-        </p>
-
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Link
-            to="/signup"
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0E9384] px-7 py-3.5 text-[15px] font-semibold text-white transition hover:scale-[1.02] hover:bg-[#0B7F74] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E9384] focus-visible:ring-offset-2"
+    <section id="inicio" className="relative overflow-hidden bg-white">
+      <div className="w-full bg-[#0E9384]">
+        <div className="mx-auto flex h-[50px] w-full max-w-[1454px] items-center justify-center px-4">
+          <p
+            style={{
+              color: "#fff",
+              fontSize: "16px",
+              fontWeight: 500,
+              textAlign: "center",
+              lineHeight: 1.4,
+              textShadow: "0 1px 2px rgba(0, 0, 0, 0.1)",
+            }}
           >
-            Começar grátis
-          </Link>
-          <Link
-            to="/demo"
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-[#E5E7EB] bg-white px-6 py-3.5 text-[15px] font-medium text-[#111827] transition hover:border-[#D1D5DB] hover:bg-[#F9FAFB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E9384] focus-visible:ring-offset-2"
-          >
-            Ver demonstração
-            <CirclePlay className="h-4 w-4" />
-          </Link>
-        </div>
-
-        <div className="mt-10 flex flex-wrap items-center gap-4">
-          <div className="flex -space-x-2">
-            {["A", "B", "C", "D"].map((item) => (
-              <span
-                key={`avatar-${item}`}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#E5E7EB] text-xs font-semibold text-[#6B7280]"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-[#0F0F14]">Usado por investidores no Brasil</p>
-            <p className="inline-flex items-center gap-1 text-sm text-[#6B7280]">
-              <Star className="h-3.5 w-3.5 text-[#D97706]" />
-              Feedback contínuo da comunidade
-            </p>
-          </div>
+            ✨ Cadastre-se e teste a Analiso gratuitamente por 28 dias!
+          </p>
         </div>
       </div>
 
-      <div className="w-full md:w-[55%]">
-        <HeroChart />
+      <HeaderClient navLinks={navLinks} />
+
+      <div className="relative mx-auto min-h-[760px] w-full max-w-[1454px] bg-white">
+        <div className="relative z-10 mx-auto flex min-h-[760px] w-full max-w-[1454px] items-center justify-center px-5 py-14 md:px-10">
+          <div
+            className="flex h-full w-full flex-col items-center justify-center text-center"
+            style={{ maxWidth: "894px", margin: "auto", padding: "0 20px 107px", gap: "34px" }}
+          >
+            <p
+              className="inline-flex items-center"
+              style={{ gap: "7px", padding: "8px 18px", color: "#737373", fontSize: "14px", fontWeight: 400, lineHeight: "20px" }}
+            >
+              <Search className="h-[18px] w-[18px] text-[#0E9384]" />
+              Software completo para investir com clareza
+            </p>
+
+            <h1
+              className="mx-auto max-w-[900px]"
+              style={{ color: "#101727", fontWeight: 600, fontSize: "60px", lineHeight: "66px" }}
+            >
+              Feita para quem quer analisar
+              <br />
+              com clareza, não com confusão.
+            </h1>
+
+            <p className="mx-auto max-w-[760px] text-[22px] leading-[1.4] text-[#4B5563]">
+              Com contexto e fonte oficial, mostramos o que realmente importa.
+              <br />
+              Entenda empresas e acompanhe mudanças com confiança.
+            </p>
+
+            <div>
+              <Link
+                to="/signup"
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E9384] focus-visible:ring-offset-2"
+                style={{
+                  display: "inline-flex",
+                  justifyContent: "center",
+                  width: "358px",
+                  alignItems: "center",
+                  padding: "18px 40px",
+                  borderRadius: "99px",
+                  background: "linear-gradient(180deg, #22BFAE 0%, #0E9384 100%)",
+                  boxShadow: "0px 8px 48px rgba(14, 147, 132, 0.4)",
+                  color: "#fff",
+                  fontSize: "18px",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                Conhecer a Analiso
+              </Link>
+              <p className="mt-3 text-base text-[#6B7280]">Teste grátis sem instalar nada.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
 }
+
 
 

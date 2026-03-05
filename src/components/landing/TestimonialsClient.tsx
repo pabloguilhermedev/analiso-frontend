@@ -1,74 +1,127 @@
 ﻿"use client";
 
-import { Sparkles } from "lucide-react";
-import { useCallback, useState } from "react";
-import type { KeyboardEvent } from "react";
+import { Link } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Star, UserCircle2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import type { Testimonial } from "../../data/landing";
 
 interface TestimonialsClientProps {
   testimonials: Testimonial[];
 }
 
+const CARDS_PER_VIEW = 3;
+
 export function TestimonialsClient({ testimonials }: TestimonialsClientProps) {
-  const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const maxStart = Math.max(0, testimonials.length - CARDS_PER_VIEW);
+  const [startIndex, setStartIndex] = useState(0);
 
-  const onKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-
-      event.preventDefault();
-      setActiveTestimonial((current) => {
-        if (event.key === "ArrowRight") {
-          return (current + 1) % testimonials.length;
-        }
-        return (current - 1 + testimonials.length) % testimonials.length;
-      });
-    },
-    [testimonials.length],
+  const visibleCards = useMemo(
+    () => testimonials.slice(startIndex, startIndex + CARDS_PER_VIEW),
+    [startIndex, testimonials],
   );
 
-  const current = testimonials[activeTestimonial];
+  const canNavigate = testimonials.length > CARDS_PER_VIEW;
+
+  const goPrev = () => {
+    if (!canNavigate) return;
+    setStartIndex((prev) => (prev === 0 ? maxStart : Math.max(0, prev - 1)));
+  };
+
+  const goNext = () => {
+    if (!canNavigate) return;
+    setStartIndex((prev) => (prev >= maxStart ? 0 : prev + 1));
+  };
 
   return (
-    <section className="bg-[#F4F6F9] px-5 py-16 md:px-10 md:py-24">
-      <div className="mx-auto w-full max-w-[1200px] text-center" onKeyDown={onKeyDown}>
-        <span className="inline-flex items-center gap-2 rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-xs text-[#6B7280]">
-          <Sparkles className="h-3.5 w-3.5 text-[#0E9384]" />
-          O que dizem os usuários
-        </span>
-        <h2 className="mt-4 text-3xl font-bold tracking-[-0.01em] text-[#0F0F14] md:text-5xl">Quando o dia finalmente faz sentido.</h2>
-
-        <article className="mx-auto mt-10 max-w-[640px] rounded-[20px] border border-[#E8EAED] bg-white p-8 text-left shadow-[0_4px_24px_rgba(0,0,0,0.07)]">
-          <p className="text-base italic leading-[1.7] text-[#111827]">“{current.quote}”</p>
-          <div className="mt-6 flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#E5E7EB] text-sm font-semibold text-[#111827]">
-              {current.name
-                .split(" ")
-                .map((part) => part[0])
-                .join("")}
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-[#111827]">{current.name}</p>
-              <p className="text-xs text-[#6B7280]">{current.role}</p>
-            </div>
+    <section className="bg-[#F4F6F9] px-5 py-14 md:px-10 md:py-20">
+      <div className="mx-auto w-full max-w-[1454px]">
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 md:items-start">
+          <div>
+            <p className="text-left" style={{ color: "#0E9384", fontSize: "12px", fontWeight: 500, lineHeight: "20px" }}>
+              Depoimentos
+            </p>
+            <p
+              className="mt-3"
+              style={{
+                fontSize: "38px",
+                fontWeight: 600,
+                color: "#101727",
+                lineHeight: "100%",
+                letterSpacing: "-0.02em",
+                textWrap: "balance",
+              }}
+            >
+              Investidores reais,
+              <br />
+              decisões mais claras.
+            </p>
           </div>
-        </article>
 
-        <div className="mt-6 flex items-center justify-center gap-2" role="tablist" aria-label="Depoimentos">
-          {testimonials.map((_, idx) => (
-            <button
-              key={`testimonial-dot-${idx}`}
-              type="button"
-              aria-label={`Ver depoimento ${idx + 1}`}
-              aria-pressed={activeTestimonial === idx}
-              onClick={() => setActiveTestimonial(idx)}
-              className={`rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E9384] focus-visible:ring-offset-2 ${
-                activeTestimonial === idx ? "h-2 w-2 bg-[#0E9384]" : "h-1.5 w-1.5 bg-[#D1D5DB]"
-              }`}
-            />
+          <div className="md:pt-1">
+            <p style={{ color: "#7E7E7E", fontSize: "16px", fontWeight: 400, lineHeight: "130%", letterSpacing: "-1px" }}>
+              Temos orgulho de ajudar investidores a entender empresas com mais clareza, tomar decisões mais conscientes e acompanhar mudanças relevantes com confiança todos os dias.
+            </p>
+            <p className="mt-3" style={{ color: "#413E52", fontSize: "16px", fontWeight: 600, lineHeight: "150%", letterSpacing: "-1px" }}>
+              Veja pessoas que transformaram a forma de analisar empresas.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {visibleCards.map((item) => (
+            <article key={`${item.name}-${item.role}`} className="rounded-3xl border border-[#E5E7EB] bg-white p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <UserCircle2 className="h-11 w-11 text-[#9CA3AF]" />
+                  <p className="text-base font-semibold text-[#374151]">{item.name}</p>
+                </div>
+                <div className="flex items-center gap-0.5 text-[#0E9384]">
+                  {Array.from({ length: 5 }).map((_, idx) => (
+                    <Star key={`${item.name}-star-${idx}`} className="h-4 w-4 fill-current" />
+                  ))}
+                </div>
+              </div>
+
+              <p className="mt-4 text-base leading-[1.55] text-[#4B5563]">"{item.quote}"</p>
+              <p className="mt-3 text-sm font-medium text-[#6B7280]">{item.role}</p>
+            </article>
           ))}
+        </div>
+
+        <div className="mt-7 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={goPrev}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#CCFBF1] text-[#0E9384] transition hover:bg-[#99F6E4] disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!canNavigate}
+            aria-label="Depoimento anterior"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#0E9384] text-white transition hover:bg-[#0B7F74] disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!canNavigate}
+            aria-label="Próximo depoimento"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="mt-8 text-center">
+          <Link
+            to="/signup"
+            className="inline-flex h-[57px] w-full max-w-[358px] items-center justify-center rounded-full bg-[#0E9384] px-8 text-[18px] font-semibold text-white shadow-[0_16px_30px_-18px_rgba(14,147,132,0.65)] transition hover:bg-[#0B7F74]"
+          >
+            Quero conhecer a Analiso
+          </Link>
+          <p className="mt-3 w-full text-center" style={{ color: "#737373", fontSize: "14px", fontWeight: 400 }}>
+            Teste grátis sem instalar nada
+          </p>
         </div>
       </div>
     </section>
   );
 }
+

@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
@@ -335,6 +335,33 @@ html {
     opacity: 1;
     transform: none;
   }
+}
+
+.landing-theme {
+  font-family: "Inter", sans-serif;
+  color: #101727;
+}
+
+.landing-title {
+  font-size: 38px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #101727;
+}
+
+.landing-text {
+  color: #413e52;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.landing-subtitle {
+  color: #0e9384;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
 }
 
 

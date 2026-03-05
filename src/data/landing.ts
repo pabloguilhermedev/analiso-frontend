@@ -26,6 +26,7 @@ export interface Testimonial {
 export interface PricingPlan {
   key: "essencial" | "premium" | "ilimitado";
   name: string;
+  idealFor: string;
   headline: string;
   monthlyPrice: number;
   annualPrice: number;
@@ -38,32 +39,149 @@ export interface PricingPlan {
   finePrint: string;
 }
 
+export interface PainPoint {
+  title: string;
+  description: string;
+}
+
+export interface ComparisonRow {
+  feature: string;
+  analiso: boolean;
+  statusInvest: boolean;
+  fundamentus: boolean;
+  detail?: string;
+}
+
+export interface ProofMetric {
+  label: string;
+  value: string;
+  helper: string;
+  source: string;
+}
+
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
 export const navLinks: NavLink[] = [
   { label: "Início", href: "#inicio" },
+  { label: "Como funciona", href: "#como-funciona" },
   { label: "Funcionalidades", href: "#funcionalidades" },
+  { label: "FAQ", href: "#faq" },
   { label: "Preços", href: "#planos" },
-  { label: "Blog", href: "#blog" },
 ];
 
 export const dataSources = ["CVM", "B3", "RI"];
+
+export const painPoints: PainPoint[] = [
+  {
+    title: "Excesso de indicador, pouca decisão",
+    description: "Você abre várias telas, cruza dezenas de números e ainda termina sem clareza do que exige ação agora.",
+  },
+  {
+    title: "Tempo gasto em garimpo manual",
+    description: "Parte do seu tempo vai para procurar dados e confirmar fonte, não para analisar risco e oportunidade.",
+  },
+  {
+    title: "Mudança relevante passa batida",
+    description: "Sem priorização, alertas críticos se misturam com ruído e decisões importantes atrasam.",
+  },
+];
+
+export const comparisonRows: ComparisonRow[] = [
+  {
+    feature: "Resumo inicial em linguagem simples",
+    analiso: true,
+    statusInvest: false,
+    fundamentus: false,
+    detail: "3 sinais + 2 riscos sem jargao",
+  },
+  {
+    feature: "Priorizacao do que exige acao agora",
+    analiso: true,
+    statusInvest: false,
+    fundamentus: false,
+    detail: "Mostra primeiro o que mudou de verdade",
+  },
+  {
+    feature: "Evidencia oficial no mesmo fluxo",
+    analiso: true,
+    statusInvest: false,
+    fundamentus: false,
+    detail: "Fonte CVM/B3/RI + data no proprio insight",
+  },
+  {
+    feature: "Detalhe sob demanda sem sair da analise",
+    analiso: true,
+    statusInvest: false,
+    fundamentus: false,
+    detail: "Botao Ver evidencia abre contexto sem quebrar fluxo",
+  },
+  {
+    feature: "Watchlist com alertas ativos",
+    analiso: true,
+    statusInvest: true,
+    fundamentus: false,
+  },
+  {
+    feature: "Consulta rapida de indicadores",
+    analiso: true,
+    statusInvest: true,
+    fundamentus: true,
+  },
+  {
+    feature: "Leitura por pilares (Divida, Caixa, Margens...)",
+    analiso: true,
+    statusInvest: false,
+    fundamentus: false,
+  },
+  {
+    feature: "Transparencia: nao e recomendacao",
+    analiso: true,
+    statusInvest: true,
+    fundamentus: true,
+  },
+];
+
+export const proofMetrics: ProofMetric[] = [
+  {
+    label: "Tempo médio para revisar uma carteira",
+    value: "-68%",
+    helper: "de 95 min para 30 min por semana",
+    source: "Base beta: usuarios ativos (n=37), jan-fev/2026",
+  },
+  {
+    label: "Decisões com evidência rastreável",
+    value: "100%",
+    helper: "insights com fonte CVM/B3/RI",
+    source: "Base beta: usuarios ativos (n=37), jan-fev/2026",
+  },
+  {
+    label: "Percepção de clareza na rotina",
+    value: "4,8/5",
+    helper: "média reportada por usuários ativos",
+    source: "Base beta: usuarios ativos (n=37), jan-fev/2026",
+  },
+];
 
 export const features: Feature[] = [
   {
     title: "Resumo Inteligente",
     description:
-      "Entenda o que mudou na sua watchlist em segundos, com contexto e evidências de CVM, B3 e RI.",
+      "Veja primeiro o que exige ação: mudanças críticas, contexto e próximos passos em uma única leitura.",
     tag: "Análise",
   },
   {
     title: "Pilares Financeiros",
     description:
-      "5 pilares monitorados automaticamente: Dívida, Caixa, Margens, Retorno e Proventos com score 0–100.",
+      "Transformamos dezenas de indicadores em 5 pilares claros: Dívida, Caixa, Margens, Retorno e Proventos.",
     tag: "Dados",
   },
   {
     title: "Alertas em Tempo Real",
     description:
-      "Receba notificações quando um indicador muda de status, com explicação objetiva e link de origem.",
+      "Receba alertas quando algo relevante muda, com explicação objetiva do impacto e link de origem.",
     tag: "Alertas",
   },
   {
@@ -77,54 +195,93 @@ export const features: Feature[] = [
 export const steps: Step[] = [
   {
     id: "01",
-    title: "Adicione empresas",
+    title: "Escolha seu nível",
     description:
-      "Monte sua watchlist com as empresas que você acompanha. Busque por ticker e adicione com um clique.",
+      "Você começa no modo iniciante ou intermediário e recebe a análise no nível certo de linguagem.",
   },
   {
     id: "02",
-    title: "Receba análises",
+    title: "Selecione empresas",
     description:
-      "A Analiso monitora indicadores automaticamente e organiza tudo por pilares com score e evidências.",
+      "Adicione os ativos da sua watchlist e definimos o que precisa de atenção primeiro.",
   },
   {
     id: "03",
-    title: "Tome decisões",
+    title: "Receba resumo + evidências",
     description:
-      "Com contexto claro e fontes verificáveis, você decide com mais confiança e menos ruído.",
+      "Você vê resumo em 60s, abre a evidência oficial com um clique e entende sem virar analista.",
   },
 ];
 
 export const testimonials: Testimonial[] = [
   {
     quote:
-      "Antes eu passava horas tentando entender o que havia mudado nas empresas da minha carteira. Com a Analiso, em 30 segundos eu já sei o que precisa da minha atenção.",
-    name: "Rodrigo Almeida",
-    role: "Investidor pessoa física",
+      "Eu travava no Status Invest porque não sabia por onde começar. Aqui já vejo 3 sinais e 2 riscos em português simples.",
+    name: "Ana Ribeiro",
+    role: "Iniciante • 3 meses investindo",
   },
   {
     quote:
-      "A clareza dos alertas com fonte oficial mudou a minha rotina. Hoje eu priorizo decisões em vez de garimpar informação.",
-    name: "Fernanda Costa",
-    role: "Analista de investimentos",
+      "Antes eu pulava entre vídeo, relatório e planilha. Agora fecho revisão semanal da watchlist em cerca de 30 minutos.",
+    name: "Gustavo Martins",
+    role: "Intermediario • 2 anos investindo",
   },
   {
     quote:
-      "Os pilares financeiros me dão uma leitura objetiva do risco sem ruído. Ganhamos velocidade e consistência no acompanhamento.",
-    name: "Marcelo Santos",
-    role: "Gestor de carteiras",
+      "O botão de ver evidência foi o que me convenceu. Eu entendo o resumo e ainda confiro a fonte oficial na hora.",
+    name: "Patricia Lima",
+    role: "Intermediaria • revisao semanal de carteira",
   },
   {
     quote:
-      "O resumo inteligente me ajuda a abrir o dia com foco. Tudo chega com contexto e evidência na mesma tela.",
-    name: "Camila Nogueira",
-    role: "Research buy-side",
-  },
-  {
-    quote:
-      "Antes eu alternava CVM, B3 e RI o tempo inteiro. Agora a plataforma centraliza tudo sem perder rastreabilidade.",
+      "Não parece recomendação pronta. É uma explicação clara do que mudou e do que eu preciso olhar com calma.",
     name: "Bruno Teixeira",
-    role: "Investidor avançado",
+    role: "Investidor PF • foco em longo prazo",
+  },
+  {
+    quote:
+      "Os pilares me ajudaram a conectar os indicadores sem jargão. Finalmente consigo conversar sobre empresa sem decorar fórmula.",
+    name: "Mariana Costa",
+    role: "Intermediaria • 1 ano analisando empresas",
+  },
+  {
+    quote:
+      "Eu usava Fundamentus para consulta, mas ainda ficava inseguro na interpretação. Aqui eu ganho contexto e prioridade.",
+    name: "Rafael Nunes",
+    role: "Intermediario • 4 anos investindo",
+  },
+];
+
+export const faqItems: FaqItem[] = [
+  {
+    question: "Isso é recomendação de investimento?",
+    answer:
+      "Não. A Analiso organiza e explica dados para apoiar sua análise. A decisão final é sempre sua.",
+  },
+  {
+    question: "De onde vêm os dados?",
+    answer:
+      "Usamos fontes oficiais: CVM, B3 e RI das empresas. Cada insight mostra origem e data de atualização.",
+  },
+  {
+    question: "Com que frequência atualiza?",
+    answer:
+      "As atualizações seguem a publicação oficial de cada fonte. Você sempre vê o carimbo de data em cada evidência.",
+  },
+  {
+    question: "Preciso entender termos técnicos para usar?",
+    answer:
+      "Não. O fluxo foi desenhado para iniciantes e intermediários, com explicação em linguagem simples e detalhe sob demanda.",
+  },
+  {
+    question: "Como os pilares são calculados?",
+    answer:
+      "Os pilares consolidam indicadores financeiros em critérios claros de risco e qualidade. O detalhe do cálculo fica disponível na evidência.",
+  },
+  {
+    question: "Funciona para FIIs e BDRs?",
+    answer:
+      "No momento, o foco principal está em empresas listadas na B3. A cobertura de outros ativos depende do plano e da etapa de produto.",
   },
 ];
 
@@ -132,6 +289,7 @@ export const pricingPlans: PricingPlan[] = [
   {
     key: "essencial",
     name: "Essencial",
+    idealFor: "Ideal para quem está começando a montar watchlist",
     headline: "Comece com confiança em minutos.",
     monthlyPrice: 19,
     annualPrice: 15,
@@ -144,13 +302,14 @@ export const pricingPlans: PricingPlan[] = [
       "Dashboard de mudanças (últimos 30 dias)",
       "Fontes oficiais (CVM/B3/RI) com data e rastreabilidade",
     ],
-    cta: "Começar",
+    cta: "Começar grátis",
     ctaHref: "/signup?plan=essencial",
-    finePrint: "Você pode mudar de plano a qualquer momento.",
+    finePrint: "",
   },
   {
     key: "premium",
     name: "Premium",
+    idealFor: "Ideal para rotina semanal de análise com mais profundidade",
     headline: "Acompanhe mudanças que importam, sem ruído.",
     monthlyPrice: 39,
     annualPrice: 31,
@@ -165,13 +324,14 @@ export const pricingPlans: PricingPlan[] = [
       "Resumo do dia (em 30s) com o que mudou e por quê",
       "Prioridade de atualização e avisos de frescor por categoria",
     ],
-    cta: "Assinar Premium",
+    cta: "Começar grátis",
     ctaHref: "/signup?plan=premium",
-    finePrint: "Transparência sempre: cada insight mostra fonte e data.",
+    finePrint: "",
   },
   {
     key: "ilimitado",
     name: "Ilimitado",
+    idealFor: "Ideal para uso diário e monitoramento intensivo",
     headline: "Para uso intenso e rotinas de estudo e monitoramento.",
     monthlyPrice: 79,
     annualPrice: 63,
@@ -185,8 +345,8 @@ export const pricingPlans: PricingPlan[] = [
       "Prioridade máxima de atualização",
       "Suporte prioritário",
     ],
-    cta: "Assinar Ilimitado",
+    cta: "Começar grátis",
     ctaHref: "/signup?plan=ilimitado",
-    finePrint: "Feito para quem acompanha o mercado todos os dias.",
+    finePrint: "",
   },
 ];
