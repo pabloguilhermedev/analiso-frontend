@@ -1,137 +1,1037 @@
-﻿
-import { useMemo, useRef, useState } from "react";
-import { Bell, Bookmark, ChevronDown, ChevronUp, FileText, Info, Plus, Search, Share2, Shuffle, X } from "lucide-react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowDown,
+  ArrowRightLeft,
+  ArrowUp,
+  Bell,
+  Bookmark,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Crown,
+  FileText,
+  Minus,
+  Plus,
+  Search,
+  Share2,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceArea,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Sidebar } from "./dashboard/sidebar";
 import { TopBar } from "./dashboard/top-bar";
+import wegLogo from "../assets/logos/weg.jpeg";
+import valeLogo from "../assets/logos/vale.png";
 
-type Pillar = "Dívida" | "Caixa/FCF" | "Margens" | "Retorno" | "Proventos";
-type Trend = "melhorando" | "estável" | "piorando";
-type Status = "Saudável" | "Atenção" | "Risco";
+type Pillar = "Divida" | "CaixaFCF" | "Margens" | "Retorno" | "Proventos";
+type Trend = "melhorando" | "estavel" | "piorando";
+type Status = "Saudavel" | "Atencao" | "Risco";
 type RangeKey = "5a" | "10a" | "max";
-type Source = { fonte: "CVM" | "B3" | "RI"; documento: string; dataColeta: string; metodo: string };
-type Point = { ano: number; valor: number };
-type Metric = { metrica: string; definicao: string; unidade: string; direction: "higher-better" | "lower-better"; valor: number; tendencia: Trend; source: Source };
-type PillarData = { score: number; status: Status; tendencia: Trend; principal: { nome: string; unidade: string; valor: number; source: Source }; serie: Point[]; domain: [number, number]; direction: "higher-better" | "lower-better"; thresholds: { texto: string }; metrics: Metric[] };
-type Company = { ticker: string; nome: string; setor: string; cor: string; atualizadoEm: string; fontePrimaria: string; gaps: string[]; pilares: Record<Pillar, PillarData> };
-type EventItem = { id: string; ticker: string; data: string; tipo: string; descricao: string; impacta: Pillar; source: Source };
-
-const PILLARS: Pillar[] = ["Dívida", "Caixa/FCF", "Margens", "Retorno", "Proventos"];
-const RANGES: Array<{ key: RangeKey; label: string; years: number | null }> = [{ key: "5a", label: "5 anos", years: 5 }, { key: "10a", label: "10 anos", years: 10 }, { key: "max", label: "Máx", years: null }];
-const statusClass: Record<Status, string> = { Saudável: "bg-emerald-50 text-emerald-700 border-emerald-200", Atenção: "bg-amber-50 text-amber-700 border-amber-200", Risco: "bg-rose-50 text-rose-700 border-rose-200" };
-const trendLabel: Record<Trend, string> = { melhorando: "Melhorando", estável: "Estável", piorando: "Piorando" };
-const f = (v: number, d = 1) => new Intl.NumberFormat("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
-const source = (fonte: "CVM" | "B3" | "RI", documento: string, dataColeta: string): Source => ({ fonte, documento, dataColeta, metodo: "Padronização de métricas com base em documentos oficiais." });
-const serie = (arr: number[]): Point[] => arr.map((valor, i) => ({ ano: 2021 + i, valor }));
-const parseDate = (v: string) => { const [dd, mm, yy] = v.split("/").map(Number); return new Date(yy, mm - 1, dd).getTime(); };
-const cmp = (direction: "higher-better" | "lower-better", a: number, b: number) => direction === "higher-better" ? a - b : b - a;
-
-const pillarCopy: Record<Pillar, { oQueMede: string; comoLer: string; porQueImporta: string; thresholds: string }> = {
-  "Dívida": { oQueMede: "Pressão do passivo sobre resultados e caixa.", comoLer: "Quanto menor e mais estável, melhor.", porQueImporta: "Dívida controlada reduz risco de estresse e preserva flexibilidade.", thresholds: "<1,5x confortável; 1,5x-2,2x atenção; >2,2x risco." },
-  "Caixa/FCF": { oQueMede: "Capacidade de gerar caixa livre com consistência.", comoLer: "Quanto maior e menos volátil, melhor.", porQueImporta: "Caixa recorrente protege execução e ciclos de investimento.", thresholds: ">10% saudável; 6%-10% atenção; <6% risco." },
-  "Margens": { oQueMede: "Eficiência operacional no tempo.", comoLer: "Margens altas e estáveis são preferíveis.", porQueImporta: "Margens resilientes sustentam retorno em cenários adversos.", thresholds: ">18% saudável; 14%-18% atenção; <14% risco." },
-  "Retorno": { oQueMede: "Qualidade da alocação de capital.", comoLer: "Retorno maior e crescente tende a ser melhor.", porQueImporta: "Retorno consistente diferencia qualidade estrutural de ciclo.", thresholds: ">14% forte; 10%-14% atenção; <10% fraco." },
-  "Proventos": { oQueMede: "Regularidade e sustentabilidade da distribuição.", comoLer: "Consistência vale mais que picos.", porQueImporta: "Proventos alinhados ao caixa aumentam confiança e previsibilidade.", thresholds: "Payout 35%-60% com estabilidade é faixa saudável." },
+type Source = {
+  provider: "CVM" | "B3" | "RI";
+  document: string;
+  updatedAt: string;
+  method: string;
+  link: string;
+  reference?: string;
 };
-const companies: Company[] = [
-  { ticker: "WEGE3", nome: "WEG", setor: "Indústria", cor: "#0E9384", atualizadoEm: "06/02/2026", fontePrimaria: "CVM/B3/RI", gaps: [], pilares: {
-    "Dívida": { score: 8.4, status: "Saudável", tendencia: "estável", principal: { nome: "Dívida líquida/EBITDA", unidade: "x", valor: 0.8, source: source("CVM", "DFP 2025", "06/02/2026") }, serie: serie([1.1,1.0,0.9,0.9,0.8]), domain: [0,3], direction: "lower-better", thresholds: { texto: "Quanto menor, melhor." }, metrics: [{ metrica: "Dívida líquida/EBITDA", definicao: "Anos de EBITDA para quitar dívida.", unidade: "x", direction: "lower-better", valor: 0.8, tendencia: "estável", source: source("CVM", "DFP 2025", "06/02/2026") }, { metrica: "Cobertura de juros", definicao: "EBIT/Despesa financeira.", unidade: "x", direction: "higher-better", valor: 8.4, tendencia: "melhorando", source: source("CVM", "DFP 2025", "06/02/2026") }] },
-    "Caixa/FCF": { score: 8.6, status: "Saudável", tendencia: "melhorando", principal: { nome: "FCF/Receita", unidade: "%", valor: 12.8, source: source("RI", "Release 4T25", "06/02/2026") }, serie: serie([10.0,10.9,11.5,12.2,12.8]), domain: [0,20], direction: "higher-better", thresholds: { texto: "Quanto maior, melhor." }, metrics: [{ metrica: "FCF/Receita", definicao: "Receita convertida em caixa livre.", unidade: "%", direction: "higher-better", valor: 12.8, tendencia: "melhorando", source: source("RI", "Release 4T25", "06/02/2026") }, { metrica: "Capex/FCF", definicao: "Investimento sobre caixa livre.", unidade: "x", direction: "lower-better", valor: 0.52, tendencia: "estável", source: source("RI", "Release 4T25", "06/02/2026") }] },
-    "Margens": { score: 7.8, status: "Saudável", tendencia: "estável", principal: { nome: "Margem EBITDA", unidade: "%", valor: 20.1, source: source("CVM", "ITR 4T25", "06/02/2026") }, serie: serie([19.0,19.4,19.8,20.0,20.1]), domain: [8,30], direction: "higher-better", thresholds: { texto: "Quanto maior, melhor." }, metrics: [{ metrica: "Margem EBITDA", definicao: "EBITDA/Receita.", unidade: "%", direction: "higher-better", valor: 20.1, tendencia: "estável", source: source("CVM", "ITR 4T25", "06/02/2026") }, { metrica: "Margem líquida", definicao: "Lucro líquido/Receita.", unidade: "%", direction: "higher-better", valor: 14.9, tendencia: "estável", source: source("CVM", "ITR 4T25", "06/02/2026") }] },
-    "Retorno": { score: 8.2, status: "Saudável", tendencia: "melhorando", principal: { nome: "ROIC", unidade: "%", valor: 16.5, source: source("CVM", "DFP 2025", "06/02/2026") }, serie: serie([14.2,14.9,15.5,16.1,16.5]), domain: [5,24], direction: "higher-better", thresholds: { texto: "Quanto maior, melhor." }, metrics: [{ metrica: "ROIC", definicao: "Retorno sobre capital investido.", unidade: "%", direction: "higher-better", valor: 16.5, tendencia: "melhorando", source: source("CVM", "DFP 2025", "06/02/2026") }, { metrica: "ROE", definicao: "Retorno sobre patrimônio.", unidade: "%", direction: "higher-better", valor: 23.2, tendencia: "melhorando", source: source("CVM", "DFP 2025", "06/02/2026") }] },
-    "Proventos": { score: 6.9, status: "Atenção", tendencia: "estável", principal: { nome: "Payout", unidade: "%", valor: 44, source: source("RI", "Política 2025", "05/02/2026") }, serie: serie([39,41,43,45,44]), domain: [10,90], direction: "higher-better", thresholds: { texto: "Faixa saudável: 35% a 60%." }, metrics: [{ metrica: "Payout", definicao: "Lucro distribuído.", unidade: "%", direction: "higher-better", valor: 44, tendencia: "estável", source: source("RI", "Política 2025", "05/02/2026") }, { metrica: "Dividend yield", definicao: "Provento/Preço.", unidade: "%", direction: "higher-better", valor: 2.3, tendencia: "estável", source: source("B3", "Histórico", "05/02/2026") }] }
-  } },
-  { ticker: "VALE3", nome: "Vale", setor: "Mineração", cor: "#334155", atualizadoEm: "05/02/2026", fontePrimaria: "CVM/B3/RI", gaps: ["Sem guidance trimestral de prazo médio da dívida em 2025."], pilares: {
-    "Dívida": { score: 6.1, status: "Atenção", tendencia: "piorando", principal: { nome: "Dívida líquida/EBITDA", unidade: "x", valor: 1.7, source: source("CVM", "DFP 2024", "05/02/2026") }, serie: serie([1.2,1.3,1.4,1.6,1.7]), domain: [0,3], direction: "lower-better", thresholds: { texto: "Quanto menor, melhor." }, metrics: [{ metrica: "Dívida líquida/EBITDA", definicao: "Anos de EBITDA para quitar dívida.", unidade: "x", direction: "lower-better", valor: 1.7, tendencia: "piorando", source: source("CVM", "DFP 2024", "05/02/2026") }, { metrica: "Cobertura de juros", definicao: "EBIT/Despesa financeira.", unidade: "x", direction: "higher-better", valor: 4.8, tendencia: "estável", source: source("CVM", "DFP 2024", "05/02/2026") }] },
-    "Caixa/FCF": { score: 5.9, status: "Atenção", tendencia: "piorando", principal: { nome: "FCF/Receita", unidade: "%", valor: 7.2, source: source("RI", "Release 4T24", "05/02/2026") }, serie: serie([10.8,9.7,8.8,7.8,7.2]), domain: [0,20], direction: "higher-better", thresholds: { texto: "Quanto maior, melhor." }, metrics: [{ metrica: "FCF/Receita", definicao: "Receita convertida em caixa livre.", unidade: "%", direction: "higher-better", valor: 7.2, tendencia: "piorando", source: source("RI", "Release 4T24", "05/02/2026") }, { metrica: "Capex/FCF", definicao: "Investimento sobre caixa livre.", unidade: "x", direction: "lower-better", valor: 1.12, tendencia: "piorando", source: source("RI", "Release 4T24", "05/02/2026") }] },
-    "Margens": { score: 6.5, status: "Atenção", tendencia: "estável", principal: { nome: "Margem EBITDA", unidade: "%", valor: 23.4, source: source("CVM", "ITR 4T24", "05/02/2026") }, serie: serie([26.2,25.8,24.9,23.9,23.4]), domain: [8,30], direction: "higher-better", thresholds: { texto: "Quanto maior, melhor." }, metrics: [{ metrica: "Margem EBITDA", definicao: "EBITDA/Receita.", unidade: "%", direction: "higher-better", valor: 23.4, tendencia: "estável", source: source("CVM", "ITR 4T24", "05/02/2026") }, { metrica: "Margem líquida", definicao: "Lucro líquido/Receita.", unidade: "%", direction: "higher-better", valor: 14.1, tendencia: "piorando", source: source("CVM", "ITR 4T24", "05/02/2026") }] },
-    "Retorno": { score: 6.6, status: "Atenção", tendencia: "estável", principal: { nome: "ROIC", unidade: "%", valor: 11.8, source: source("CVM", "DFP 2024", "05/02/2026") }, serie: serie([13.1,12.8,12.4,12.1,11.8]), domain: [5,24], direction: "higher-better", thresholds: { texto: "Quanto maior, melhor." }, metrics: [{ metrica: "ROIC", definicao: "Retorno sobre capital investido.", unidade: "%", direction: "higher-better", valor: 11.8, tendencia: "estável", source: source("CVM", "DFP 2024", "05/02/2026") }, { metrica: "ROE", definicao: "Retorno sobre patrimônio.", unidade: "%", direction: "higher-better", valor: 16.2, tendencia: "estável", source: source("CVM", "DFP 2024", "05/02/2026") }] },
-    "Proventos": { score: 7.1, status: "Saudável", tendencia: "melhorando", principal: { nome: "Payout", unidade: "%", valor: 52, source: source("RI", "Política 2024", "05/02/2026") }, serie: serie([41,44,47,50,52]), domain: [10,90], direction: "higher-better", thresholds: { texto: "Faixa saudável: 35% a 60%." }, metrics: [{ metrica: "Payout", definicao: "Lucro distribuído.", unidade: "%", direction: "higher-better", valor: 52, tendencia: "melhorando", source: source("RI", "Política 2024", "05/02/2026") }, { metrica: "Dividend yield", definicao: "Provento/Preço.", unidade: "%", direction: "higher-better", valor: 7.2, tendencia: "estável", source: source("B3", "Histórico", "05/02/2026") }] }
-  } },
-  { ticker: "ITUB4", nome: "Itaú Unibanco", setor: "Bancos", cor: "#F97316", atualizadoEm: "07/02/2026", fontePrimaria: "CVM/B3/RI", gaps: [], pilares: {
-    "Dívida": { score: 7.5, status: "Saudável", tendencia: "estável", principal: { nome: "Alavancagem financeira", unidade: "x", valor: 1.1, source: source("CVM", "DFP 2025", "07/02/2026") }, serie: serie([1.2,1.2,1.1,1.1,1.1]), domain: [0,3], direction: "lower-better", thresholds: { texto: "Quanto menor, melhor." }, metrics: [{ metrica: "Alavancagem financeira", definicao: "Ativo/Patrimônio.", unidade: "x", direction: "lower-better", valor: 1.1, tendencia: "estável", source: source("CVM", "DFP 2025", "07/02/2026") }, { metrica: "Cobertura de juros", definicao: "Margem/Despesa de captação.", unidade: "x", direction: "higher-better", valor: 6.2, tendencia: "estável", source: source("CVM", "DFP 2025", "07/02/2026") }] },
-    "Caixa/FCF": { score: 7.3, status: "Saudável", tendencia: "estável", principal: { nome: "FCF/Patrimônio", unidade: "%", valor: 10.2, source: source("RI", "Release 4T25", "07/02/2026") }, serie: serie([8.9,9.2,9.7,10.0,10.2]), domain: [0,20], direction: "higher-better", thresholds: { texto: "Quanto maior, melhor." }, metrics: [{ metrica: "FCF/Patrimônio", definicao: "Caixa livre sobre patrimônio.", unidade: "%", direction: "higher-better", valor: 10.2, tendencia: "estável", source: source("RI", "Release 4T25", "07/02/2026") }, { metrica: "Capex/FCF", definicao: "Investimento sobre caixa livre.", unidade: "x", direction: "lower-better", valor: 0.63, tendencia: "estável", source: source("RI", "Release 4T25", "07/02/2026") }] },
-    "Margens": { score: 7.2, status: "Saudável", tendencia: "estável", principal: { nome: "Margem financeira", unidade: "%", valor: 24.6, source: source("CVM", "ITR 4T25", "07/02/2026") }, serie: serie([22.8,23.4,24.0,24.3,24.6]), domain: [8,30], direction: "higher-better", thresholds: { texto: "Quanto maior, melhor." }, metrics: [{ metrica: "Margem financeira", definicao: "Resultado financeiro/Ativos.", unidade: "%", direction: "higher-better", valor: 24.6, tendencia: "estável", source: source("CVM", "ITR 4T25", "07/02/2026") }, { metrica: "Margem líquida", definicao: "Lucro líquido/Receita.", unidade: "%", direction: "higher-better", valor: 18.4, tendencia: "melhorando", source: source("CVM", "ITR 4T25", "07/02/2026") }] },
-    "Retorno": { score: 8.1, status: "Saudável", tendencia: "melhorando", principal: { nome: "ROE", unidade: "%", valor: 20.3, source: source("CVM", "DFP 2025", "07/02/2026") }, serie: serie([16.7,17.9,18.8,19.6,20.3]), domain: [5,24], direction: "higher-better", thresholds: { texto: "Quanto maior, melhor." }, metrics: [{ metrica: "ROE", definicao: "Retorno sobre patrimônio.", unidade: "%", direction: "higher-better", valor: 20.3, tendencia: "melhorando", source: source("CVM", "DFP 2025", "07/02/2026") }, { metrica: "ROIC", definicao: "Retorno sobre capital investido.", unidade: "%", direction: "higher-better", valor: 14.8, tendencia: "melhorando", source: source("CVM", "DFP 2025", "07/02/2026") }] },
-    "Proventos": { score: 7.8, status: "Saudável", tendencia: "melhorando", principal: { nome: "Payout", unidade: "%", valor: 48, source: source("RI", "Calendário 2025", "07/02/2026") }, serie: serie([40,43,45,47,48]), domain: [10,90], direction: "higher-better", thresholds: { texto: "Faixa saudável: 35% a 60%." }, metrics: [{ metrica: "Payout", definicao: "Lucro distribuído.", unidade: "%", direction: "higher-better", valor: 48, tendencia: "melhorando", source: source("RI", "Calendário 2025", "07/02/2026") }, { metrica: "Dividend yield", definicao: "Provento/Preço.", unidade: "%", direction: "higher-better", valor: 5.1, tendencia: "estável", source: source("B3", "Histórico", "07/02/2026") }] }
-  } }
-];
+type Point = { year: number; value: number };
+type Metric = {
+  name: string;
+  definition: string;
+  unit: string;
+  direction: "higher-better" | "lower-better";
+  value: number | null;
+  trend: Trend;
+  source: Source;
+};
+type PillarData = {
+  score: number;
+  status: Status;
+  thresholdLabel: string;
+  domain: [number, number];
+  bands: { safe: [number, number]; warning: [number, number]; risk: [number, number] };
+  series: Point[];
+  metrics: Metric[];
+};
+type Company = {
+  ticker: string;
+  name: string;
+  sector: string;
+  updatedAt: string;
+  primarySource: string;
+  confidence: "Alta" | "Media" | "Baixa";
+  gaps: string[];
+  pillars: Record<Pillar, PillarData>;
+};
+type EventItem = {
+  id: string;
+  ticker: string;
+  date: string;
+  type: string;
+  summary: string;
+  impact: Pillar;
+  source: Source;
+};
+type Evidence = {
+  metricName: string;
+  definition: string;
+  unit: string;
+  source: Source;
+  aTicker: string;
+  bTicker: string;
+  aValue: number | null;
+  bValue: number | null;
+};
 
+const TOKENS = {
+  brand600: "#0E9384",
+  brand700: "#0B7A6E",
+  brand100: "#D9FBEF",
+  bg: "#F7F8FA",
+  border: "#E7EAEE",
+  text900: "#0F172A",
+  text600: "#475569",
+  text400: "#94A3B8",
+  companyA: "#0E9384",
+  companyB: "#3F5F7D",
+  companyB100: "#ECF3F9",
+};
+
+const SLOT_COLORS = [TOKENS.companyA, TOKENS.companyB, "#64748B", "#94A3B8"];
+const PILLARS: Pillar[] = ["Divida", "CaixaFCF", "Margens", "Retorno", "Proventos"];
+const PILLAR_LABEL: Record<Pillar, string> = {
+  Divida: "Divida",
+  CaixaFCF: "Caixa/FCF",
+  Margens: "Margens",
+  Retorno: "Retorno",
+  Proventos: "Proventos",
+};
+
+const trendLabel: Record<Trend, string> = {
+  melhorando: "Melhorando",
+  estavel: "Estavel",
+  piorando: "Piorando",
+};
+const RANGES: Array<{ key: RangeKey; label: string; years: number | null }> = [
+  { key: "5a", label: "5 anos", years: 5 },
+  { key: "10a", label: "10 anos", years: 10 },
+  { key: "max", label: "Max", years: null },
+];
+const pillarCopy: Record<Pillar, { what: string; how: string; why: string; ranges: [string, string, string] }> = {
+  Divida: {
+    what: "Mede pressao de alavancagem.",
+    how: "Menor e mais estavel tende a ser melhor.",
+    why: "Reduz risco de estresse financeiro.",
+    ranges: ["< 1,5x confortavel", "1,5-2,2x atencao", "> 2,2x risco"],
+  },
+  CaixaFCF: {
+    what: "Mede geracao de caixa livre.",
+    how: "Maior e menos volatil tende a ser melhor.",
+    why: "Sustenta execucao e investimento.",
+    ranges: ["> 10% saudavel", "6%-10% atencao", "< 6% risco"],
+  },
+  Margens: {
+    what: "Mede eficiencia operacional.",
+    how: "Margens altas e estaveis sao melhores.",
+    why: "Preserva resultado em ciclos ruins.",
+    ranges: ["> 18% saudavel", "14%-18% atencao", "< 14% risco"],
+  },
+  Retorno: {
+    what: "Mede retorno sobre capital.",
+    how: "Retorno maior com boa tendencia e melhor.",
+    why: "Mostra qualidade estrutural.",
+    ranges: ["> 14% forte", "10%-14% atencao", "< 10% fraco"],
+  },
+  Proventos: {
+    what: "Mede consistencia de distribuicao.",
+    how: "Consistencia vale mais que pico.",
+    why: "Aumenta previsibilidade ao acionista.",
+    ranges: ["Payout 35%-60% saudavel", "< 35% atencao", "> 60% atencao"],
+  },
+};
+
+const n = (value: number, digits = 1) =>
+  new Intl.NumberFormat("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+const parseDate = (value: string) => {
+  const [dd, mm, yyyy] = value.split("/").map(Number);
+  return new Date(yyyy, mm - 1, dd).getTime();
+};
+const buildSeries = (list: number[]) => list.map((value, i) => ({ year: 2021 + i, value }));
+const mkSource = (
+  provider: "CVM" | "B3" | "RI",
+  document: string,
+  updatedAt: string,
+  link: string,
+  reference?: string,
+): Source => ({
+  provider,
+  document,
+  updatedAt,
+  link,
+  reference,
+  method: "Padronizacao de metricas a partir de documentos oficiais.",
+});
+
+const weg: Company = {
+  ticker: "WEGE3",
+  name: "WEG",
+  sector: "Industria",
+  updatedAt: "06/02/2026",
+  primarySource: "CVM / B3 / RI",
+  confidence: "Alta",
+  gaps: [],
+  pillars: {
+    Divida: {
+      score: 8.4,
+      status: "Saudavel",
+      thresholdLabel: "Quanto menor, melhor.",
+      domain: [0, 3],
+      bands: { safe: [0, 1.5], warning: [1.5, 2.2], risk: [2.2, 3] },
+      series: buildSeries([1.1, 1.0, 0.9, 0.9, 0.8]),
+      metrics: [
+        { name: "Divida liquida/EBITDA", definition: "Anos de EBITDA para quitar divida.", unit: "x", direction: "lower-better", value: 0.8, trend: "estavel", source: mkSource("CVM", "DFP 2025", "06/02/2026", "https://www.cvm.gov.br/") },
+        { name: "Cobertura de juros", definition: "EBIT sobre despesa financeira.", unit: "x", direction: "higher-better", value: 8.4, trend: "melhorando", source: mkSource("CVM", "DFP 2025", "06/02/2026", "https://www.cvm.gov.br/") },
+      ],
+    },
+    CaixaFCF: {
+      score: 8.6,
+      status: "Saudavel",
+      thresholdLabel: "Quanto maior, melhor.",
+      domain: [0, 20],
+      bands: { safe: [10, 20], warning: [6, 10], risk: [0, 6] },
+      series: buildSeries([10.1, 10.9, 11.5, 12.2, 12.8]),
+      metrics: [
+        { name: "FCF/Receita", definition: "Receita convertida em caixa livre.", unit: "%", direction: "higher-better", value: 12.8, trend: "melhorando", source: mkSource("RI", "Release 4T25", "06/02/2026", "https://ri.weg.net/") },
+        { name: "Capex/FCF", definition: "Investimento sobre caixa livre.", unit: "x", direction: "lower-better", value: 0.52, trend: "estavel", source: mkSource("RI", "Release 4T25", "06/02/2026", "https://ri.weg.net/") },
+      ],
+    },
+    Margens: {
+      score: 7.8,
+      status: "Saudavel",
+      thresholdLabel: "Quanto maior, melhor.",
+      domain: [8, 30],
+      bands: { safe: [18, 30], warning: [14, 18], risk: [8, 14] },
+      series: buildSeries([19, 19.4, 19.8, 20, 20.1]),
+      metrics: [
+        { name: "Margem EBITDA", definition: "EBITDA/Receita.", unit: "%", direction: "higher-better", value: 20.1, trend: "estavel", source: mkSource("CVM", "ITR 4T25", "06/02/2026", "https://www.cvm.gov.br/") },
+        { name: "Margem liquida", definition: "Lucro liquido/Receita.", unit: "%", direction: "higher-better", value: 14.9, trend: "estavel", source: mkSource("CVM", "ITR 4T25", "06/02/2026", "https://www.cvm.gov.br/") },
+      ],
+    },
+    Retorno: {
+      score: 8.2,
+      status: "Saudavel",
+      thresholdLabel: "Quanto maior, melhor.",
+      domain: [5, 24],
+      bands: { safe: [14, 24], warning: [10, 14], risk: [5, 10] },
+      series: buildSeries([14.2, 14.9, 15.5, 16.1, 16.5]),
+      metrics: [
+        { name: "ROIC", definition: "Retorno sobre capital investido.", unit: "%", direction: "higher-better", value: 16.5, trend: "melhorando", source: mkSource("CVM", "DFP 2025", "06/02/2026", "https://www.cvm.gov.br/") },
+        { name: "ROE", definition: "Retorno sobre patrimonio.", unit: "%", direction: "higher-better", value: 23.2, trend: "melhorando", source: mkSource("CVM", "DFP 2025", "06/02/2026", "https://www.cvm.gov.br/") },
+      ],
+    },
+    Proventos: {
+      score: 6.9,
+      status: "Atencao",
+      thresholdLabel: "Faixa saudavel: 35% a 60%.",
+      domain: [10, 90],
+      bands: { safe: [35, 60], warning: [25, 35], risk: [10, 25] },
+      series: buildSeries([39, 41, 43, 45, 44]),
+      metrics: [
+        { name: "Payout", definition: "Lucro distribuido.", unit: "%", direction: "higher-better", value: 44, trend: "estavel", source: mkSource("RI", "Politica 2025", "05/02/2026", "https://ri.weg.net/") },
+        { name: "Dividend Yield", definition: "Provento/Preco.", unit: "%", direction: "higher-better", value: 2.3, trend: "estavel", source: mkSource("B3", "Historico", "05/02/2026", "https://www.b3.com.br/") },
+      ],
+    },
+  },
+};
+
+const vale: Company = {
+  ticker: "VALE3",
+  name: "Vale",
+  sector: "Mineracao",
+  updatedAt: "05/02/2026",
+  primarySource: "CVM / B3 / RI",
+  confidence: "Media",
+  gaps: ["Sem guidance trimestral de prazo medio da divida em 2025."],
+  pillars: {
+    Divida: { ...weg.pillars.Divida, score: 6.1, status: "Atencao", series: buildSeries([1.2, 1.3, 1.4, 1.6, 1.7]), metrics: [{ ...weg.pillars.Divida.metrics[0], value: 1.7, trend: "piorando", source: mkSource("CVM", "DFP 2024", "05/02/2026", "https://www.cvm.gov.br/") }, { ...weg.pillars.Divida.metrics[1], value: 4.8, trend: "estavel", source: mkSource("CVM", "DFP 2024", "05/02/2026", "https://www.cvm.gov.br/") }] },
+    CaixaFCF: { ...weg.pillars.CaixaFCF, score: 5.9, status: "Atencao", series: buildSeries([10.8, 9.7, 8.8, 7.8, 7.2]), metrics: [{ ...weg.pillars.CaixaFCF.metrics[0], value: 7.2, trend: "piorando", source: mkSource("RI", "Release 4T24", "05/02/2026", "https://ri.vale.com/") }, { ...weg.pillars.CaixaFCF.metrics[1], value: 1.12, trend: "piorando", source: mkSource("RI", "Release 4T24", "05/02/2026", "https://ri.vale.com/") }] },
+    Margens: { ...weg.pillars.Margens, score: 6.5, status: "Atencao", series: buildSeries([26.2, 25.8, 24.9, 23.9, 23.4]), metrics: [{ ...weg.pillars.Margens.metrics[0], value: 23.4, source: mkSource("CVM", "ITR 4T24", "05/02/2026", "https://www.cvm.gov.br/") }, { ...weg.pillars.Margens.metrics[1], value: 14.1, trend: "piorando", source: mkSource("CVM", "ITR 4T24", "05/02/2026", "https://www.cvm.gov.br/") }] },
+    Retorno: { ...weg.pillars.Retorno, score: 6.6, status: "Atencao", series: buildSeries([13.1, 12.8, 12.4, 12.1, 11.8]), metrics: [{ ...weg.pillars.Retorno.metrics[0], value: 11.8, trend: "estavel", source: mkSource("CVM", "DFP 2024", "05/02/2026", "https://www.cvm.gov.br/") }, { ...weg.pillars.Retorno.metrics[1], value: null, trend: "estavel", source: mkSource("CVM", "DFP 2024", "05/02/2026", "https://www.cvm.gov.br/", "Campo nao reportado no consolidado.") }] },
+    Proventos: { ...weg.pillars.Proventos, score: 7.1, status: "Saudavel", series: buildSeries([41, 44, 47, 50, 52]), metrics: [{ ...weg.pillars.Proventos.metrics[0], value: 52, trend: "melhorando", source: mkSource("RI", "Politica 2024", "05/02/2026", "https://ri.vale.com/") }, { ...weg.pillars.Proventos.metrics[1], value: 7.2, source: mkSource("B3", "Historico", "05/02/2026", "https://www.b3.com.br/") }] },
+  },
+};
+
+const itub: Company = {
+  ticker: "ITUB4",
+  name: "Itau Unibanco",
+  sector: "Bancos",
+  updatedAt: "07/02/2026",
+  primarySource: "CVM / B3 / RI",
+  confidence: "Alta",
+  gaps: [],
+  pillars: {
+    Divida: { ...weg.pillars.Divida, score: 7.5 },
+    CaixaFCF: { ...weg.pillars.CaixaFCF, score: 7.3 },
+    Margens: { ...weg.pillars.Margens, score: 7.2 },
+    Retorno: { ...weg.pillars.Retorno, score: 8.1 },
+    Proventos: { ...weg.pillars.Proventos, score: 7.8 },
+  },
+};
+
+const companies: Company[] = [weg, vale, itub];
 const events: EventItem[] = [
-  { id: "1", ticker: "VALE3", data: "24/01/2026", tipo: "Fato relevante", descricao: "Atualização de capex com pressão de caixa no curto prazo.", impacta: "Caixa/FCF", source: source("B3", "Fato relevante 24-01", "24/01/2026") },
-  { id: "2", ticker: "WEGE3", data: "30/01/2026", tipo: "Resultado", descricao: "Resultado trimestral com margem operacional estável.", impacta: "Margens", source: source("RI", "Release 4T25", "30/01/2026") },
-  { id: "3", ticker: "ITUB4", data: "19/01/2026", tipo: "Proventos", descricao: "Anúncio de JCP dentro da faixa histórica.", impacta: "Proventos", source: source("RI", "Comunicado de JCP", "19/01/2026") },
-  { id: "4", ticker: "VALE3", data: "07/12/2025", tipo: "Emissão", descricao: "Captação de dívida para refinanciamento de curto prazo.", impacta: "Dívida", source: source("CVM", "Formulário de emissão", "08/12/2025") },
+  { id: "1", ticker: "VALE3", date: "24/01/2026", type: "Fato relevante", summary: "Atualizacao de capex com pressao de caixa no curto prazo.", impact: "CaixaFCF", source: mkSource("B3", "Fato relevante 24-01", "24/01/2026", "https://www.b3.com.br/") },
+  { id: "2", ticker: "WEGE3", date: "30/01/2026", type: "Resultado", summary: "Resultado trimestral com margem operacional estavel.", impact: "Margens", source: mkSource("RI", "Release 4T25", "30/01/2026", "https://ri.weg.net/") },
+  { id: "3", ticker: "VALE3", date: "17/12/2025", type: "Emissao", summary: "Captacao para refinanciamento de curto prazo.", impact: "Divida", source: mkSource("CVM", "Comunicado de emissao", "17/12/2025", "https://www.cvm.gov.br/") },
 ];
 
-function EvidenceDrawer({ sourceData, title, onClose }: { sourceData: Source | null; title: string; onClose: () => void }) {
-  if (!sourceData) return null;
-  return <div className="fixed inset-0 z-50"><button className="absolute inset-0 bg-black/30" onClick={onClose} /><aside className="absolute inset-y-0 right-0 w-full max-w-[420px] border-l border-[#E4E7EC] bg-white p-6 shadow-2xl"><div className="mb-6 flex items-center justify-between"><div><p className="text-xs uppercase tracking-wide text-[#667085]">Fonte</p><h3 className="text-base font-semibold text-[#0B1220]">{title}</h3></div><button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full border border-[#E4E7EC]"><X className="h-4 w-4" /></button></div><div className="space-y-4 text-sm"><div><p className="text-xs text-[#667085]">Origem</p><p className="font-medium">{sourceData.fonte}</p></div><div><p className="text-xs text-[#667085]">Documento</p><p className="font-medium">{sourceData.documento}</p></div><div><p className="text-xs text-[#667085]">Data de coleta</p><p className="font-medium">{sourceData.dataColeta}</p></div><div><p className="text-xs text-[#667085]">Método</p><p>{sourceData.metodo}</p></div></div></aside></div>;
+const formatMetric = (value: number | null, unit: string) => (value === null ? "Dados indisponiveis" : `${n(value, unit === "x" ? 2 : 1)} ${unit}`);
+const metricDelta = (a: number | null, b: number | null) => (a === null || b === null ? null : Math.abs(a - b));
+const metricWinner = (direction: "higher-better" | "lower-better", a: number | null, b: number | null) => {
+  if (a === null && b === null) return "tie";
+  if (a === null) return "b";
+  if (b === null) return "a";
+  if (direction === "higher-better") return a > b ? "a" : b > a ? "b" : "tie";
+  return a < b ? "a" : b < a ? "b" : "tie";
+};
+const trendIcon = (t: Trend) => (t === "melhorando" ? <ArrowUp className="h-3 w-3" /> : t === "piorando" ? <ArrowDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />);
+const trendFromSeries = (series: Point[]): Trend => {
+  if (!series.length) return "estavel";
+  const first = series[0]?.value ?? 0;
+  const last = series[series.length - 1]?.value ?? 0;
+  const delta = last - first;
+  if (Math.abs(delta) <= Math.max(0.2, Math.abs(first) * 0.03)) return "estavel";
+  return delta > 0 ? "melhorando" : "piorando";
+};
+const confidenceLabel = (pair: Company[]) => {
+  if (pair.every((c) => c.confidence === "Alta")) return "Alta";
+  if (pair.some((c) => c.confidence === "Baixa")) return "Baixa";
+  return "Media";
+};
+const pillarInsight = (pillar: Pillar, winner: string) => {
+  if (pillar === "CaixaFCF") return `${winner} converte melhor resultado em caixa e sustenta execucao com mais folga.`;
+  if (pillar === "Divida") return `${winner} opera com alavancagem mais controlada no periodo.`;
+  if (pillar === "Margens") return `${winner} preserva eficiencia operacional com mais consistencia.`;
+  if (pillar === "Retorno") return `${winner} extrai mais resultado do capital investido.`;
+  return `${winner} mostra distribuicao mais previsivel para o acionista.`;
+};
+const trendContext = (trend: Trend) => {
+  if (trend === "melhorando") return "Tendencia recente reforca a leitura";
+  if (trend === "piorando") return "Tendencia recente pede cautela";
+  return "Tendencia recente esta estavel";
+};
+const TICKER_LOGOS: Record<string, string> = {
+  WEGE3: wegLogo,
+  VALE3: valeLogo,
+};
+
+function TickerLogo({ ticker, size = 18 }: { ticker: string; size?: number }) {
+  const logo = TICKER_LOGOS[ticker];
+  if (!logo) {
+    return (
+      <span
+        className="inline-flex items-center justify-center rounded-full border border-[#E7EAEE] bg-white text-[10px] font-semibold text-[#475569]"
+        style={{ width: size, height: size }}
+      >
+        {ticker.slice(0, 1)}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={logo}
+      alt={`Logo ${ticker}`}
+      className="rounded-full border border-[#E7EAEE] bg-white object-cover"
+      style={{ width: size, height: size }}
+    />
+  );
 }
 
-const LoadingState = () => <div className="space-y-4"><div className="h-28 animate-pulse rounded-2xl border border-[#E4E7EC] bg-white" /><div className="h-52 animate-pulse rounded-2xl border border-[#E4E7EC] bg-white" /><div className="h-64 animate-pulse rounded-2xl border border-[#E4E7EC] bg-white" /></div>;
-const EmptyState = () => <section className="rounded-2xl border border-[#E4E7EC] bg-white p-8 text-center"><h2 className="text-base font-semibold">Adicione 2 empresas para comparar</h2><p className="mt-2 text-sm text-[#667085]">Comece escolhendo Empresa A e Empresa B no topo. Em poucos segundos você verá vencedor, deltas e evidências.</p></section>;
-function StickyBar(p: { selected: Company[]; selectedTickers: string[]; search: string; setSearch: (v: string) => void; open: boolean; setOpen: (b: boolean) => void; available: Company[]; add: (t: string) => void; remove: (t: string) => void; swap: () => void; range: RangeKey; setRange: (r: RangeKey) => void; pillar: Pillar; onSave: () => void; onAlert: () => void; onShare: () => void; }) {
-  return <section className="sticky top-16 z-30 mb-6 rounded-2xl border border-[#E4E7EC] bg-white/95 p-4 shadow-[0_8px_24px_rgba(16,24,40,0.08)] backdrop-blur"><div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"><div className="flex flex-1 flex-col gap-3"><div className="flex flex-wrap items-center gap-2">{p.selected.map((c, i) => <span key={c.ticker} className="inline-flex items-center gap-2 rounded-full border border-[#CDECE7] bg-[#ECFDF3] px-3 py-1 text-xs font-medium text-[#0E9384]">{i === 0 ? "Empresa A" : i === 1 ? "Empresa B" : `Empresa ${i + 1}`}: {c.ticker}<button onClick={() => p.remove(c.ticker)}><X className="h-3.5 w-3.5" /></button></span>)}{p.selected.length < 4 && <button onClick={() => p.setOpen(!p.open)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#D0D5DD] px-3 py-1 text-xs text-[#475467]"><Plus className="h-3.5 w-3.5" />Adicionar</button>}{p.selected.length >= 2 && <button onClick={p.swap} className="inline-flex items-center gap-1 rounded-full border border-[#E4E7EC] bg-[#F8FAFC] px-3 py-1 text-xs text-[#475467]"><Shuffle className="h-3.5 w-3.5" />Swap A/B</button>}<span className="rounded-full border border-[#E4E7EC] bg-[#F8FAFC] px-2.5 py-1 text-xs text-[#667085]">{p.selectedTickers.length}/4</span></div><div className="relative max-w-[420px]"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-[#98A2B3]" /><input value={p.search} onChange={(e) => { p.setSearch(e.target.value); p.setOpen(true); }} onFocus={() => p.setOpen(true)} placeholder="Buscar ticker ou nome" className="w-full rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] py-2 pl-9 pr-3 text-sm" />{p.open && p.selected.length < 4 && <div className="absolute z-40 mt-2 w-full rounded-xl border border-[#E4E7EC] bg-white p-1 shadow-xl">{p.available.length ? p.available.map((c) => <button key={c.ticker} onClick={() => p.add(c.ticker)} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-[#F8FAFC]"><div><p className="text-xs font-semibold">{c.ticker}</p><p className="text-[11px] text-[#667085]">{c.nome}</p></div><span className="text-[11px] text-[#98A2B3]">{c.setor}</span></button>) : <p className="px-3 py-2 text-xs text-[#98A2B3]">Nenhuma empresa encontrada.</p>}</div>}</div></div><div className="flex flex-col gap-3 xl:items-end"><div className="flex items-center rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] p-1">{RANGES.map((r) => <button key={r.key} onClick={() => p.setRange(r.key)} className={`rounded-lg px-3 py-1.5 text-xs ${p.range === r.key ? "bg-[#0E9384] text-white" : "text-[#667085]"}`}>{r.label}</button>)}</div><div className="flex flex-wrap items-center gap-2"><button onClick={p.onSave} className="inline-flex items-center gap-2 rounded-lg border border-[#E4E7EC] bg-white px-3 py-2 text-xs"><Bookmark className="h-3.5 w-3.5" />Salvar comparação</button><button onClick={p.onAlert} className="inline-flex items-center gap-2 rounded-lg border border-[#CDECE7] bg-[#ECFDF3] px-3 py-2 text-xs font-medium text-[#0E9384]"><Bell className="h-3.5 w-3.5" />Criar alerta ({p.pillar})</button><button onClick={p.onShare} className="inline-flex items-center gap-2 rounded-lg border border-[#E4E7EC] bg-white px-3 py-2 text-xs"><Share2 className="h-3.5 w-3.5" />Compartilhar</button></div></div></div></section>;
+function EvidenceDrawer({ data, onClose }: { data: Evidence | null; onClose: () => void }) {
+  if (!data) return null;
+  return (
+    <div className="fixed inset-0 z-50">
+      <button onClick={onClose} className="absolute inset-0 bg-black/30" />
+      <aside className="absolute inset-y-0 right-0 w-full max-w-[460px] overflow-y-auto border-l border-[#E7EAEE] bg-white p-6 shadow-2xl">
+        <div className="mb-6 flex items-start justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-[#94A3B8]">Evidence drawer</p>
+            <h3 className="mt-1 text-lg font-semibold text-[#0F172A]">{data.metricName}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-full border border-[#E7EAEE] p-1.5 text-[#475569]">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-4 text-sm">
+          <div className="rounded-xl border border-[#E7EAEE] bg-[#F8FAFC] p-4">
+            <p className="text-[12px] font-semibold text-[#475569]">Valor atual A/B</p>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-[#475569]">{data.aTicker}</p>
+                <p className="font-semibold">{formatMetric(data.aValue, data.unit)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#475569]">{data.bTicker}</p>
+                <p className="font-semibold">{formatMetric(data.bValue, data.unit)}</p>
+              </div>
+            </div>
+          </div>
+          <div>
+            <p className="text-[12px] font-semibold text-[#475569]">Definicao simples</p>
+            <p className="mt-1 text-[#0F172A]">{data.definition}</p>
+          </div>
+          <div>
+            <p className="text-[12px] font-semibold text-[#475569]">Como calculamos</p>
+            <p className="mt-1 text-[#0F172A]">{data.source.method}</p>
+          </div>
+          <div>
+            <p className="text-[12px] font-semibold text-[#475569]">Fonte</p>
+            <p className="mt-1 text-[#0F172A]">
+              {data.source.provider} / {data.source.document}
+            </p>
+          </div>
+          <div>
+            <p className="text-[12px] font-semibold text-[#475569]">Data de atualizacao</p>
+            <p className="mt-1 text-[#0F172A]">{data.source.updatedAt}</p>
+          </div>
+          {data.source.reference ? (
+            <div>
+              <p className="text-[12px] font-semibold text-[#475569]">Trecho/identificador</p>
+              <p className="mt-1 text-[#0F172A]">{data.source.reference}</p>
+            </div>
+          ) : null}
+          <a
+            href={data.source.link}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#E7EAEE] px-3 py-2 text-sm font-medium text-[#0F172A] hover:bg-[#F8FAFC]"
+          >
+            Abrir documento <Share2 className="h-3.5 w-3.5" />
+          </a>
+        </div>
+      </aside>
+    </div>
+  );
 }
 
-function Scoreboard30s({ winner, score, attention, divergence, bullets }: { winner: string; score: number; attention: string; divergence: string; bullets: string[] }) {
-  return <section className="rounded-2xl border border-[#E4E7EC] bg-white p-6"><p className="text-xs uppercase tracking-[0.12em] text-[#667085]">Placar em 30 segundos</p><div className="mt-3 grid grid-cols-1 gap-4 xl:grid-cols-3"><div><p className="text-xs text-[#667085]">Melhor no geral hoje</p><p className="mt-1 text-xl font-semibold">{winner} <span className="text-sm text-[#667085]">({f(score, 1)}/10)</span></p></div><div><p className="text-xs text-[#667085]">Maior atenção</p><p className="mt-1 text-sm font-medium">{attention}</p></div><div><p className="text-xs text-[#667085]">Maior divergência</p><p className="mt-1 text-sm font-medium">{divergence}</p></div></div><ul className="mt-4 space-y-2 text-sm text-[#475467]">{bullets.slice(0, 3).map((b) => <li key={b} className="rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] px-3 py-2">{b}</li>)}</ul></section>;
-}
+const LoadingBlocks = () => (
+  <div className="space-y-8">
+    <div className="h-[160px] animate-pulse rounded-2xl border border-[#E7EAEE] bg-white" />
+    <div className="h-[220px] animate-pulse rounded-2xl border border-[#E7EAEE] bg-white" />
+    <div className="h-[300px] animate-pulse rounded-2xl border border-[#E7EAEE] bg-white" />
+  </div>
+);
 
-function PillarMap({ selected, active, onSelect }: { selected: Company[]; active: Pillar; onSelect: (p: Pillar) => void }) {
-  const advanced = selected.length > 2;
-  return <section className="rounded-2xl border border-[#E4E7EC] bg-white p-5"><h2 className="text-sm font-semibold">Mapa de pilares</h2><p className="mt-1 text-xs text-[#667085]">Clique em um pilar para ver o detalhe com evidências.</p><div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-5">{PILLARS.map((pillar) => { const rank = [...selected].map((c) => ({ c, p: c.pilares[pillar] })).sort((a, b) => b.p.score - a.p.score); const w = rank[0]; const l = rank[rank.length - 1]; const a = rank[0]?.p.principal; const b = rank[1]?.p.principal; const delta = a && b ? Math.abs(a.valor - b.valor) : 0; return <button key={pillar} onClick={() => onSelect(pillar)} className={`rounded-xl border p-4 text-left ${active === pillar ? "border-[#0E9384] bg-[#ECFDF3]" : "border-[#E4E7EC] bg-white hover:border-[#B7E4DC]"}`}><p className="text-sm font-semibold">{pillar}</p><p className="mt-1 text-xs text-[#667085]">Melhor: {w?.c.ticker}</p>{!advanced && a && b ? <p className="mt-3 text-xs text-[#475467]">{f(a.valor, 1)}{a.unidade} vs {f(b.valor, 1)}{b.unidade} - Δ {f(delta, 1)}{a.unidade}</p> : <p className="mt-3 text-xs text-[#475467]">Ranking: {w?.c.ticker} no topo e {l?.c.ticker} na base.</p>}<span className={`mt-3 inline-flex rounded-full border px-2 py-0.5 text-[11px] ${statusClass[w.p.status]}`}>{w.p.status}</span></button>; })}</div></section>;
-}
-function PillarDetail({ pillar, selected, range, openSource }: { pillar: Pillar; selected: Company[]; range: RangeKey; openSource: (s: Source, t: string) => void }) {
-  const cp = pillarCopy[pillar];
-  const lineData = useMemo(() => { const m: Record<number, Record<string, number | string>> = {}; selected.forEach((co) => { const years = RANGES.find((r) => r.key === range)?.years; const data = years ? co.pilares[pillar].serie.slice(-years) : co.pilares[pillar].serie; data.forEach((pt) => { if (!m[pt.ano]) m[pt.ano] = { ano: pt.ano }; m[pt.ano][co.ticker] = pt.valor; }); }); return Object.values(m).sort((a, b) => Number(a.ano) - Number(b.ano)); }, [selected, range, pillar]);
-  const first = selected[0];
-  const rows = first.pilares[pillar].metrics.map((mt) => ({ metrica: mt.metrica, definicao: mt.definicao, unidade: mt.unidade, direction: mt.direction, values: selected.map((co) => ({ ticker: co.ticker, valor: co.pilares[pillar].metrics.find((x) => x.metrica === mt.metrica)?.valor ?? 0, tendencia: co.pilares[pillar].metrics.find((x) => x.metrica === mt.metrica)?.tendencia ?? "estável", source: co.pilares[pillar].metrics.find((x) => x.metrica === mt.metrica)?.source ?? mt.source, serie: co.pilares[pillar].serie })) }));
-  return <section className="rounded-2xl border border-[#E4E7EC] bg-white p-5"><div className="mb-4 flex items-center justify-between"><h2 className="text-sm font-semibold">Detalhe do pilar: {pillar}</h2><button onClick={() => openSource(first.pilares[pillar].principal.source, `${pillar} - métrica principal`)} className="inline-flex items-center gap-2 rounded-lg border border-[#E4E7EC] bg-white px-3 py-1.5 text-xs"><FileText className="h-3.5 w-3.5 text-[#0E9384]" />Ver fonte</button></div><div className="grid grid-cols-1 gap-4 xl:grid-cols-12"><article className="rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] p-4 xl:col-span-4"><div className="space-y-3 text-sm"><div><p className="text-xs text-[#667085]">O que mede</p><p className="font-medium">{cp.oQueMede}</p></div><div><p className="text-xs text-[#667085]">Como ler</p><p className="font-medium">{cp.comoLer}</p></div><div><p className="text-xs text-[#667085]">Por que importa</p><p>{cp.porQueImporta}</p></div><div><p className="text-xs text-[#667085]">Faixas</p><p>{cp.thresholds}</p></div></div></article><article className="rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] p-4 xl:col-span-8"><div className="mb-3 rounded-lg border border-[#E4E7EC] bg-white p-2 text-[11px] text-[#667085]">{first.pilares[pillar].thresholds.texto}</div><div className="h-[260px] rounded-lg border border-[#E4E7EC] bg-white p-3"><ResponsiveContainer width="100%" height="100%"><LineChart data={lineData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}><CartesianGrid stroke="#E4E7EC" strokeDasharray="3 3" vertical={false} /><XAxis dataKey="ano" tick={{ fill: "#98A2B3", fontSize: 11 }} tickLine={false} axisLine={false} /><YAxis domain={first.pilares[pillar].domain} tick={{ fill: "#98A2B3", fontSize: 11 }} tickLine={false} axisLine={false} width={30} /><Tooltip content={({ active, label, payload }) => { if (!active || !payload?.length) return null; return <div className="rounded-lg border border-[#E4E7EC] bg-white p-2 text-xs shadow-lg"><p className="font-medium">Ano: {label}</p>{payload.map((item) => <p key={`${item.name}-${label}`} style={{ color: item.color as string }}>{item.name}: {f(Number(item.value), 2)}</p>)}</div>; }} />{selected.map((co) => <Line key={`${pillar}-${co.ticker}`} type="monotone" dataKey={co.ticker} stroke={co.cor} strokeWidth={2.2} dot={{ r: 2 }} activeDot={{ r: 4 }} />)}</LineChart></ResponsiveContainer></div></article></div><div className="mt-4 overflow-x-auto rounded-xl border border-[#E4E7EC]"><table className="min-w-full divide-y divide-[#E4E7EC] bg-white text-sm"><thead className="bg-[#F8FAFC] text-xs text-[#667085]"><tr><th className="px-3 py-2 text-left font-medium">Métrica</th>{selected.map((co) => <th key={co.ticker} className="px-3 py-2 text-left font-medium">{co.ticker}</th>)}<th className="px-3 py-2 text-left font-medium">Δ (diferença)</th><th className="px-3 py-2 text-left font-medium">Fonte</th></tr></thead><tbody className="divide-y divide-[#E4E7EC]">{rows.map((row) => { const sorted = [...row.values].sort((a, b) => (cmp(row.direction, a.valor, b.valor) > 0 ? -1 : 1)); const best = sorted[0]?.ticker; const worst = sorted[sorted.length - 1]?.ticker; const delta = Math.abs((sorted[0]?.valor ?? 0) - (sorted[sorted.length - 1]?.valor ?? 0)); return <tr key={row.metrica}><td className="px-3 py-2 align-top"><div className="flex items-start gap-2"><div><p className="font-medium">{row.metrica}</p><p className="text-[11px] text-[#667085]">{row.definicao}</p></div><span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[#E4E7EC] text-[11px] text-[#667085]">?</span></div></td>{row.values.map((v) => { const td = (v.serie[v.serie.length - 1]?.valor ?? 0) - (v.serie[v.serie.length - 2]?.valor ?? 0); return <td key={`${row.metrica}-${v.ticker}`} className="px-3 py-2 align-top"><p className={v.ticker === best ? "text-emerald-700" : v.ticker === worst ? "text-rose-700" : "text-[#0B1220]"}>{f(v.valor, 2)} {row.unidade}</p><p className="text-[11px] text-[#667085]">{trendLabel[v.tendencia]} ({td > 0 ? `+${f(td, 2)}` : f(td, 2)})</p></td>; })}<td className="px-3 py-2 align-top font-semibold">{f(delta, 2)} {row.unidade}</td><td className="px-3 py-2 align-top"><button onClick={() => openSource(row.values[0].source, `${pillar} - ${row.metrica}`)} className="rounded-md border border-[#E4E7EC] p-1.5 text-[#667085] hover:bg-[#F8FAFC]" title="Fonte"><FileText className="h-3.5 w-3.5" /></button></td></tr>; })}</tbody></table></div></section>;
-}
-
-function Events({ selectedTickers, pillar, openSource }: { selectedTickers: string[]; pillar: Pillar; openSource: (s: Source, t: string) => void }) {
-  const list = events.filter((e) => selectedTickers.includes(e.ticker) && e.impacta === pillar).sort((a, b) => parseDate(b.data) - parseDate(a.data));
-  return <section className="rounded-2xl border border-[#E4E7EC] bg-white p-4"><h3 className="text-sm font-semibold">Eventos recentes (60-90 dias)</h3><p className="mt-1 text-xs text-[#667085]">Filtrado pelo pilar atual: {pillar}</p><div className="mt-3 space-y-2">{list.length ? list.map((e) => <article key={e.id} className="rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] p-3"><div className="flex items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2 text-xs text-[#667085]"><span>{e.data}</span><span className="rounded-full border border-[#E4E7EC] bg-white px-2 py-0.5">{e.tipo}</span><span className="rounded-full border border-[#E4E7EC] bg-white px-2 py-0.5">{e.ticker}</span></div><button onClick={() => openSource(e.source, `Evento - ${e.ticker}`)} className="rounded-md border border-[#E4E7EC] p-1.5 text-[#667085] hover:bg-white"><FileText className="h-3.5 w-3.5" /></button></div><p className="mt-2 text-sm">{e.descricao}</p><p className="mt-1 text-xs text-[#475467]">Impacta: {e.impacta}</p></article>) : <p className="rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] px-3 py-2 text-sm text-[#667085]">Nenhum evento relevante encontrado para o pilar atual nessa janela.</p>}</div></section>;
-}
-
-function DataQuality({ selected }: { selected: Company[] }) {
-  return <section className="rounded-2xl border border-[#E4E7EC] bg-white p-4"><h3 className="text-sm font-semibold">Qualidade dos dados</h3><div className="mt-3 space-y-2">{selected.map((c) => <article key={c.ticker} className="rounded-xl border border-[#E4E7EC] bg-[#F8FAFC] p-3 text-xs text-[#475467]"><p className="font-semibold text-[#0B1220]">{c.ticker}</p><p>Última atualização: {c.atualizadoEm}</p><p>Fonte primária: {c.fontePrimaria}</p>{c.gaps.length ? <p className="text-amber-700">Gap: {c.gaps.join(" ")}</p> : <p className="text-emerald-700">Sem gaps relevantes.</p>}</article>)}</div></section>;
-}
 export function ComparePage() {
   const detailRef = useRef<HTMLDivElement | null>(null);
+  const mounted = useRef(false);
   const [selectedTickers, setSelectedTickers] = useState<string[]>(["WEGE3", "VALE3"]);
   const [search, setSearch] = useState("");
   const [openPicker, setOpenPicker] = useState(false);
-  const [pillar, setPillar] = useState<Pillar>("Dívida");
+  const [activePillar, setActivePillar] = useState<Pillar>("Divida");
   const [range, setRange] = useState<RangeKey>("5a");
-  const [loading] = useState(false);
-  const [sourceData, setSourceData] = useState<Source | null>(null);
-  const [sourceTitle, setSourceTitle] = useState("Fonte");
-  const [toast, setToast] = useState("");
   const [eventsOpen, setEventsOpen] = useState(false);
   const [qualityOpen, setQualityOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [evidence, setEvidence] = useState<Evidence | null>(null);
+  const [toast, setToast] = useState("");
+  const [compactSticky, setCompactSticky] = useState(false);
+  const [compactSearchOpen, setCompactSearchOpen] = useState(false);
 
-  const selected = useMemo(() => companies.filter((c) => selectedTickers.includes(c.ticker)), [selectedTickers]);
-  const available = useMemo(() => companies.filter((c) => !selectedTickers.includes(c.ticker) && (!search || `${c.ticker} ${c.nome}`.toLowerCase().includes(search.toLowerCase()))), [search, selectedTickers]);
-  const spreads = useMemo(() => PILLARS.map((p) => ({ pillar: p, spread: selected.length ? Math.max(...selected.map((c) => c.pilares[p].score)) - Math.min(...selected.map((c) => c.pilares[p].score)) : 0 })).sort((a, b) => b.spread - a.spread), [selected]);
-  const winner = useMemo(() => [...selected].map((c) => ({ c, avg: PILLARS.reduce((acc, p) => acc + c.pilares[p].score, 0) / PILLARS.length })).sort((a, b) => b.avg - a.avg)[0], [selected]);
-  const attention = useMemo(() => selected.flatMap((c) => PILLARS.map((p) => ({ c, p, score: c.pilares[p].score }))).sort((a, b) => a.score - b.score)[0], [selected]);
-  const bullets = useMemo(() => [`${winner?.c.ticker ?? "-"} é mais consistente em ${spreads[0]?.pillar ?? pillar} e ${spreads[1]?.pillar ?? pillar}.`, `${attention?.c.ticker ?? "-"} mostra maior variabilidade em ${attention?.p ?? pillar}.`, `${pillar} separa as empresas por tendência recente.`], [winner, spreads, attention, pillar]);
+  const selected = useMemo(
+    () => selectedTickers.map((t) => companies.find((c) => c.ticker === t)).filter(Boolean) as Company[],
+    [selectedTickers],
+  );
+  const pair = selected.slice(0, 2);
+  const a = pair[0];
+  const b = pair[1];
+  const canCompare = pair.length >= 2;
+  const available = useMemo(
+    () =>
+      companies.filter(
+        (c) =>
+          !selectedTickers.includes(c.ticker) &&
+          (!search || `${c.ticker} ${c.name}`.toLowerCase().includes(search.toLowerCase())),
+      ),
+    [selectedTickers, search],
+  );
 
-  const openSource = (s1: Source, t: string) => { setSourceData(s1); setSourceTitle(t); };
-  const notify = (msg: string) => { setToast(msg); window.setTimeout(() => setToast(""), 2600); };
-  const add = (ticker: string) => { if (selectedTickers.length >= 4 || selectedTickers.includes(ticker)) return; setSelectedTickers((v) => [...v, ticker]); setSearch(""); setOpenPicker(false); };
-  const remove = (ticker: string) => setSelectedTickers((v) => v.filter((x) => x !== ticker));
-  const swap = () => setSelectedTickers((v) => (v.length < 2 ? v : [v[1], v[0], ...v.slice(2)]));
-  const selectPillar = (p: Pillar) => { setPillar(p); if (detailRef.current && detailRef.current.getBoundingClientRect().top < 0) detailRef.current.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    setRefreshing(true);
+    const t = window.setTimeout(() => setRefreshing(false), 350);
+    return () => window.clearTimeout(t);
+  }, [selectedTickers, activePillar, range]);
 
-  const onSave = () => notify(`Snapshot salvo em ${new Date().toLocaleDateString("pt-BR")}.`);
-  const onAlert = () => notify(`Alerta criado para o pilar ${pillar}.`);
-  const onShare = async () => { const qs = new URLSearchParams({ tickers: selectedTickers.join(","), range, pilar: pillar }); const link = `${window.location.origin}/comparar?${qs.toString()}`; try { if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(link); notify("Link de comparação copiado."); } catch { notify(`Compartilhar: ${link}`); } };
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(""), 2200);
+    return () => window.clearTimeout(t);
+  }, [toast]);
 
-  return <div className="min-h-screen bg-[#F7F8FA] text-[#0B1220]"><div className="hidden lg:block"><Sidebar currentPage="comparar" /></div><TopBar updatedAt="07/02/2026" /><main className="pt-16 lg:ml-[270px]"><div className="mx-auto max-w-[1480px] px-6 py-6 xl:px-8"><div className="mb-4 hidden items-center justify-between lg:flex"><div><h1 className="text-base font-semibold">Comparar empresas</h1><p className="mt-1 text-xs text-[#667085]">Clareza rápida: vencedor, diferença e evidência com fonte sob demanda.</p></div><span className="rounded-full border border-[#E4E7EC] bg-white px-3 py-1 text-xs text-[#667085]">Prioridade: Placar &gt; Pilares &gt; Detalhe &gt; Contexto</span></div><StickyBar selected={selected} selectedTickers={selectedTickers} search={search} setSearch={setSearch} open={openPicker} setOpen={setOpenPicker} available={available} add={add} remove={remove} swap={swap} range={range} setRange={setRange} pillar={pillar} onSave={onSave} onAlert={onAlert} onShare={onShare} />{loading ? <LoadingState /> : selected.length < 2 ? <EmptyState /> : <div className="space-y-4"><Scoreboard30s winner={winner?.c.ticker ?? "-"} score={winner?.avg ?? 0} attention={attention ? `${attention.c.ticker} em ${attention.p}` : "-"} divergence={spreads.length > 1 ? `${spreads[0].pillar} e ${spreads[1].pillar}` : spreads[0]?.pillar ?? pillar} bullets={bullets} /><PillarMap selected={selected} active={pillar} onSelect={selectPillar} /><div ref={detailRef}><PillarDetail pillar={pillar} selected={selected} range={range} openSource={openSource} /></div><section className="space-y-3"><button onClick={() => setEventsOpen((x) => !x)} className="flex w-full items-center justify-between rounded-xl border border-[#E4E7EC] bg-white px-4 py-3 text-left"><span className="text-sm font-semibold">Contexto: eventos recentes</span>{eventsOpen ? <ChevronUp className="h-4 w-4 text-[#667085]" /> : <ChevronDown className="h-4 w-4 text-[#667085]" />}</button>{eventsOpen && <Events selectedTickers={selectedTickers} pillar={pillar} openSource={openSource} />}<button onClick={() => setQualityOpen((x) => !x)} className="flex w-full items-center justify-between rounded-xl border border-[#E4E7EC] bg-white px-4 py-3 text-left"><span className="text-sm font-semibold">Contexto: qualidade dos dados</span>{qualityOpen ? <ChevronUp className="h-4 w-4 text-[#667085]" /> : <ChevronDown className="h-4 w-4 text-[#667085]" />}</button>{qualityOpen && <DataQuality selected={selected} />}</section></div>}<p className="mt-4 text-[11px] text-[#98A2B3]">Conteúdo educacional. Não representa recomendação de compra ou venda.</p></div></main>{toast && <div className="fixed bottom-6 right-6 z-50 rounded-lg border border-[#B7E4DC] bg-[#ECFDF3] px-3 py-2 text-xs text-[#0E9384] shadow-lg">{toast}</div>}<EvidenceDrawer sourceData={sourceData} title={sourceTitle} onClose={() => setSourceData(null)} /><button onClick={() => openSource(selected[0]?.pilares[pillar].principal.source ?? source("RI", "Sem fonte", "-"), `${pillar} - metodologia`)} className="fixed bottom-6 left-6 z-40 inline-flex items-center gap-2 rounded-lg border border-[#E4E7EC] bg-white px-3 py-2 text-xs text-[#475467] shadow-md"><Info className="h-3.5 w-3.5 text-[#0E9384]" />Evidência e fonte</button></div>;
+  useEffect(() => {
+    const onScroll = () => setCompactSticky(window.scrollY > 110);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const years = RANGES.find((r) => r.key === range)?.years ?? null;
+  const chartData = useMemo(() => {
+    if (!a || !b) return [];
+    const as = years ? a.pillars[activePillar].series.slice(-years) : a.pillars[activePillar].series;
+    const bs = years ? b.pillars[activePillar].series.slice(-years) : b.pillars[activePillar].series;
+    return as.map((p, i) => ({ year: p.year, a: p.value, b: bs[i]?.value ?? null }));
+  }, [a, b, activePillar, years]);
+
+  const scoreboard = useMemo(() => {
+    if (!a || !b) return null;
+    const avgA = PILLARS.reduce((acc, p) => acc + a.pillars[p].score, 0) / PILLARS.length;
+    const avgB = PILLARS.reduce((acc, p) => acc + b.pillars[p].score, 0) / PILLARS.length;
+    const winner = avgA >= avgB ? a : b;
+    const attention = [
+      ...PILLARS.map((p) => ({ c: a, p, s: a.pillars[p].score })),
+      ...PILLARS.map((p) => ({ c: b, p, s: b.pillars[p].score })),
+    ].sort((x, y) => x.s - y.s)[0];
+    const spread = PILLARS.map((p) => ({ p, d: Math.abs(a.pillars[p].score - b.pillars[p].score) })).sort(
+      (x, y) => y.d - x.d,
+    )[0];
+    return { winner, score: Math.max(avgA, avgB), attention, spread, avgA, avgB };
+  }, [a, b]);
+
+  const pillarDiffs = useMemo(() => {
+    if (!a || !b) return [];
+    return PILLARS.map((p) => {
+      const da = a.pillars[p];
+      const db = b.pillars[p];
+      const winner = da.score >= db.score ? a : b;
+      const loser = winner.ticker === a.ticker ? b : a;
+      const winnerTrend = winner.ticker === a.ticker ? trendFromSeries(da.series) : trendFromSeries(db.series);
+      const loserTrend = loser.ticker === a.ticker ? trendFromSeries(da.series) : trendFromSeries(db.series);
+      return {
+        p,
+        da,
+        db,
+        winner,
+        loser,
+        delta: Math.abs(da.score - db.score),
+        lowestScore: Math.min(da.score, db.score),
+        winnerTrend,
+        loserTrend,
+      };
+    }).sort((x, y) => y.delta - x.delta);
+  }, [a, b]);
+
+  const topPillarDiffs = pillarDiffs.slice(0, 3);
+  const otherPillarDiffs = pillarDiffs.slice(3);
+
+  const verdict = useMemo(() => {
+    if (!a || !b || !scoreboard) return null;
+    const winner = scoreboard.avgA >= scoreboard.avgB ? a : b;
+    const loser = winner.ticker === a.ticker ? b : a;
+    const biggestGap = pillarDiffs[0];
+    const keyRisk = [...pillarDiffs].sort((x, y) => x.lowestScore - y.lowestScore)[0];
+    const reasons = topPillarDiffs.map((item) => {
+      if (item.p === "CaixaFCF") return `${item.winner.ticker} converte melhor resultado em caixa e sustenta execucao.`;
+      if (item.p === "Divida") return `${item.winner.ticker} opera com alavancagem mais controlada no periodo.`;
+      if (item.p === "Margens") return `${item.winner.ticker} preserva eficiencia operacional com mais consistencia.`;
+      if (item.p === "Retorno") return `${item.winner.ticker} entrega retorno mais robusto sobre o capital.`;
+      return `${item.winner.ticker} mostra distribuicao mais previsivel aos acionistas.`;
+    });
+    return {
+      winner,
+      loser,
+      biggestGap,
+      keyRisk,
+      reasons,
+      confidence: confidenceLabel(pair),
+      latestUpdate: pair.map((c) => c.updatedAt).sort((x, y) => parseDate(y) - parseDate(x))[0],
+    };
+  }, [a, b, pair, pillarDiffs, scoreboard, topPillarDiffs]);
+
+  const tableRows = useMemo(() => {
+    if (!a || !b) return [];
+    const ma = a.pillars[activePillar].metrics;
+    const mb = b.pillars[activePillar].metrics;
+    const names = Array.from(new Set([...ma.map((m) => m.name), ...mb.map((m) => m.name)]));
+    return names.map((name) => {
+      const am = ma.find((m) => m.name === name) ?? null;
+      const bm = mb.find((m) => m.name === name) ?? null;
+      return {
+        name,
+        definition: am?.definition ?? bm?.definition ?? "Sem definicao",
+        unit: am?.unit ?? bm?.unit ?? "",
+        direction: am?.direction ?? bm?.direction ?? "higher-better",
+        a: am,
+        b: bm,
+      };
+    });
+  }, [a, b, activePillar]);
+
+  const activePillarWinnerSummary = useMemo(() => {
+    if (!a || !b || !tableRows.length) return null;
+    const winsA = tableRows.filter((row) => metricWinner(row.direction, row.a?.value ?? null, row.b?.value ?? null) === "a").length;
+    const winsB = tableRows.filter((row) => metricWinner(row.direction, row.a?.value ?? null, row.b?.value ?? null) === "b").length;
+    const leader = winsA >= winsB ? a.ticker : b.ticker;
+    const wins = Math.max(winsA, winsB);
+    return `${leader} vence em ${wins} de ${tableRows.length} metricas deste pilar.`;
+  }, [a, b, tableRows]);
+
+  const recentEvents = useMemo(() => {
+    if (!a || !b) return [];
+    const now = new Date(2026, 2, 6).getTime();
+    const d90 = 90 * 24 * 60 * 60 * 1000;
+    return events.filter((e) => [a.ticker, b.ticker].includes(e.ticker) && now - parseDate(e.date) <= d90);
+  }, [a, b]);
+
+  const eventsOnActivePillar = useMemo(
+    () => recentEvents.filter((event) => event.impact === activePillar).length,
+    [recentEvents, activePillar],
+  );
+  const latestChartDelta = useMemo(() => {
+    if (!chartData.length) return null;
+    const last = chartData[chartData.length - 1];
+    if (last?.a === null || last?.b === null || last?.a === undefined || last?.b === undefined) return null;
+    return Math.abs(Number(last.a) - Number(last.b));
+  }, [chartData]);
+  const qualityTone = useMemo(() => {
+    const latest = pair.map((c) => c.updatedAt).sort((x, y) => parseDate(y) - parseDate(x))[0];
+    const hasCriticalGap = pair.some((c) => c.gaps.some((g) => g.toLowerCase().includes("critico")));
+    const hasGap = pair.some((c) => c.gaps.length > 0);
+    if (hasCriticalGap) return { dot: "bg-[#B91C1C]", label: "Risco" };
+    if (hasGap) return { dot: "bg-[#B45309]", label: "Atencao" };
+    if (latest && Date.now() - parseDate(latest) < 60 * 24 * 60 * 60 * 1000) return { dot: "bg-[#16A34A]", label: "Saudavel" };
+    return { dot: "bg-[#B45309]", label: "Atencao" };
+  }, [pair]);
+
+  const openEvidence = (row: { name: string; definition: string; unit: string; a: Metric | null; b: Metric | null }) => {
+    if (!a || !b) return;
+    const src = row.a?.source ?? row.b?.source;
+    if (!src) return;
+    setEvidence({
+      metricName: row.name,
+      definition: row.definition,
+      unit: row.unit,
+      source: src,
+      aTicker: a.ticker,
+      bTicker: b.ticker,
+      aValue: row.a?.value ?? null,
+      bValue: row.b?.value ?? null,
+    });
+  };
+
+  const addTicker = (ticker: string) => {
+    if (selectedTickers.includes(ticker) || selectedTickers.length >= 4) return;
+    setSelectedTickers((prev) => [...prev, ticker]);
+    setOpenPicker(false);
+    setSearch("");
+  };
+
+  const selectPillar = (pillar: Pillar) => {
+    setActivePillar(pillar);
+    if (detailRef.current && detailRef.current.getBoundingClientRect().top < 0) {
+      detailRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F7F8FA] text-[#0F172A]" style={{ fontFamily: "Inter, sans-serif" }}>
+      <div className="hidden lg:block">
+        <Sidebar currentPage="comparar" />
+      </div>
+      <TopBar updatedAt="07/02/2026" />
+      <main className="pt-16 lg:ml-[88px]">
+        <div className="mx-auto max-w-[1240px] px-4 py-8 sm:px-6 lg:px-8">
+          <section className={`sticky top-16 z-30 mb-7 rounded-[20px] border border-[#E7EAEE] bg-white/95 shadow-[0_6px_16px_rgba(15,23,42,0.05)] backdrop-blur transition-all ${compactSticky ? "p-2" : "p-2.5"}`}>
+            <div className="flex flex-col gap-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {selected.map((c, i) => (
+                    <span
+                      key={c.ticker}
+                      className={`inline-flex items-center gap-2 rounded-xl border border-[#E7EAEE] bg-white font-medium text-[#0F172A] transition-all ${compactSticky ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: SLOT_COLORS[i] }} />
+                      <TickerLogo ticker={c.ticker} size={compactSticky ? 14 : 16} />
+                      {i === 0 ? "Empresa A" : i === 1 ? "Empresa B" : `Empresa ${i + 1}`}: {c.ticker}
+                      <button
+                        onClick={() => setSelectedTickers((p) => p.filter((t) => t !== c.ticker))}
+                        className="rounded-full p-0.5 hover:bg-black/5"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                  {!compactSticky && selected.length < 4 ? (
+                    <button
+                      onClick={() => setOpenPicker((v) => !v)}
+                      className="inline-flex items-center gap-1 rounded-xl border border-dashed border-[#E7EAEE] px-2.5 py-1.5 text-xs font-medium text-[#475569] hover:border-[#0E9384]"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Adicionar empresa
+                    </button>
+                  ) : null}
+                  {!compactSticky && selected.length >= 2 ? (
+                    <button
+                      onClick={() => setSelectedTickers((v) => (v.length < 2 ? v : [v[1], v[0], ...v.slice(2)]))}
+                      className="inline-flex items-center gap-1 rounded-xl border border-[#E7EAEE] bg-[#F8FAFC] px-2.5 py-1.5 text-xs font-medium text-[#475569]"
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5" />
+                      Trocar A/B
+                    </button>
+                  ) : null}
+                </div>
+                <div className="flex items-center rounded-xl border border-[#E7EAEE] bg-[#F8FAFC] p-0.5">
+                  {RANGES.map((r) => (
+                    <button
+                      key={r.key}
+                      onClick={() => setRange(r.key)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-medium ${range === r.key ? "bg-[#0E9384] text-white" : "text-[#475569]"}`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                {!compactSticky ? <div className="relative w-full max-w-[420px]">
+                  <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-[#94A3B8]" />
+                  <input
+                    value={search}
+                    onFocus={() => setOpenPicker(true)}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setOpenPicker(true);
+                    }}
+                    className="h-8 w-full rounded-xl border border-[#E7EAEE] bg-white pl-8 pr-3 text-xs"
+                    placeholder="Buscar ticker ou nome (opcional)"
+                  />
+                  {openPicker && selected.length < 4 ? (
+                    <div className="absolute z-40 mt-2 w-full rounded-xl border border-[#E7EAEE] bg-white p-1 shadow-xl">
+                      {available.length ? (
+                        available.map((c) => (
+                          <button key={c.ticker} onClick={() => addTicker(c.ticker)} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-[#F8FAFC]">
+                            <div>
+                              <p className="text-xs font-semibold">{c.ticker}</p>
+                              <p className="text-[11px] text-[#475569]">{c.name}</p>
+                            </div>
+                            <span className="text-[11px] text-[#94A3B8]">{c.sector}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="px-3 py-2 text-xs text-[#94A3B8]">Nenhuma empresa encontrada.</p>
+                      )}
+                    </div>
+                  ) : null}
+                </div> : <div className="relative">
+                  <button
+                    onClick={() => setCompactSearchOpen((v) => !v)}
+                    className="inline-flex h-8 items-center gap-1 rounded-xl border border-[#E7EAEE] bg-white px-2.5 text-xs font-medium text-[#475569]"
+                  >
+                    <Search className="h-3.5 w-3.5" />
+                    Buscar
+                  </button>
+                  {compactSearchOpen ? (
+                    <div className="absolute z-40 mt-2 w-[320px] rounded-xl border border-[#E7EAEE] bg-white p-2 shadow-xl">
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-[#94A3B8]" />
+                        <input
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          className="w-full rounded-xl border border-[#E7EAEE] bg-white py-2 pl-9 pr-3 text-sm"
+                          placeholder="Buscar ticker ou nome"
+                        />
+                      </div>
+                      <div className="mt-1 max-h-[220px] overflow-y-auto">
+                        {available.length ? (
+                          available.map((c) => (
+                            <button key={c.ticker} onClick={() => { addTicker(c.ticker); setCompactSearchOpen(false); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-[#F8FAFC]">
+                              <div>
+                                <p className="text-xs font-semibold">{c.ticker}</p>
+                                <p className="text-[11px] text-[#475569]">{c.name}</p>
+                              </div>
+                              <span className="text-[11px] text-[#94A3B8]">{c.sector}</span>
+                            </button>
+                          ))
+                        ) : (
+                          <p className="px-3 py-2 text-xs text-[#94A3B8]">Nenhuma empresa encontrada.</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={() => setToast("Comparacao salva.")} className="inline-flex h-8 items-center gap-2 rounded-xl border border-[#E7EAEE] px-2.5 text-xs font-medium text-[#475569]"><Bookmark className="h-3.5 w-3.5" />Salvar comparacao</button>
+                  <button onClick={async () => {
+                    const qs = new URLSearchParams({ tickers: selectedTickers.join(","), range, pilar: activePillar });
+                    const link = `${window.location.origin}/comparar?${qs.toString()}`;
+                    try {
+                      await navigator.clipboard.writeText(link);
+                      setToast("Link copiado.");
+                    } catch {
+                      setToast(link);
+                    }
+                  }} className="inline-flex h-8 items-center gap-2 rounded-xl border border-[#E7EAEE] px-2.5 text-xs font-medium text-[#475569]"><Share2 className="h-3.5 w-3.5" />Compartilhar</button>
+                  {canCompare ? <div className="inline-flex items-center gap-1"><button onClick={() => setToast(`Alerta criado para ${PILLAR_LABEL[activePillar]}.`)} className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[#D3EAE4] bg-[#F3FBF8] px-2.5 text-xs font-medium text-[#0B7A6E]"><Bell className="h-3.5 w-3.5" />Acompanhar mudancas</button><span className="rounded-lg border border-[#E7EAEE] bg-white px-2 py-1 text-[11px] text-[#475569]">{PILLAR_LABEL[activePillar]}</span></div> : null}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {!canCompare ? (
+            <section className="rounded-2xl border border-[#E7EAEE] bg-white p-8 text-center">
+              <h2 className="text-xl font-semibold">Selecione duas empresas para comparar</h2>
+              <p className="mt-2 text-sm text-[#475569]">Adicione Empresa A e Empresa B para ver quem esta melhor hoje, onde esta o risco e como confirmar.</p>
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                {["WEGE3", "VALE3", "ITUB4"].map((t) => (
+                  <button key={t} onClick={() => addTicker(t)} className="rounded-xl border border-[#E7EAEE] bg-[#F8FAFC] px-3 py-1.5 text-xs font-medium">{t}</button>
+                ))}
+              </div>
+            </section>
+          ) : refreshing ? (
+            <LoadingBlocks />
+          ) : (
+            <div className="space-y-8">
+              {verdict && a && b ? (
+                <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+                  <article className="rounded-3xl border border-[#DDE3EA] bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)] xl:col-span-8">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0E9384]">Veredito da comparacao</p>
+                    <h2 className="mt-2 text-[28px] font-semibold leading-tight">
+                      {verdict.winner.ticker} aparece mais solida que {verdict.loser.ticker} hoje.
+                    </h2>
+                    <p className="mt-3 text-sm text-[#475569]">Baseado em 5 pilares | Dados oficiais de CVM, B3 e RI | Atualizado em {verdict.latestUpdate}</p>
+                    <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-[#E7EAEE] bg-[#F8FAFC] p-3 sm:grid-cols-3">
+                      <div className="rounded-xl bg-white px-3 py-2">
+                        <p className="text-[11px] text-[#64748B]">{a.ticker}</p>
+                        <p className="text-base font-semibold text-[#0E9384]">{n(scoreboard?.avgA ?? 0, 1)}</p>
+                      </div>
+                      <div className="rounded-xl bg-white px-3 py-2">
+                        <p className="text-[11px] text-[#64748B]">{b.ticker}</p>
+                        <p className="text-base font-semibold text-[#3F5F7D]">{n(scoreboard?.avgB ?? 0, 1)}</p>
+                      </div>
+                      <div className="rounded-xl bg-white px-3 py-2">
+                        <p className="text-[11px] text-[#64748B]">Diferenca</p>
+                        <p className="text-base font-semibold text-[#0F172A]">{n(Math.abs((scoreboard?.avgA ?? 0) - (scoreboard?.avgB ?? 0)), 1)} pts</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#F1F5F9] px-3 py-1.5 text-xs font-medium text-[#334155]">
+                      <Check className="h-3.5 w-3.5 text-[#0E9384]" />
+                      Confianca da leitura: {verdict.confidence}
+                    </div>
+                    <ul className="mt-4 space-y-2 text-sm text-[#334155]">
+                      {verdict.reasons.slice(0, 3).map((reason) => (
+                        <li key={reason} className="flex items-start gap-2">
+                          <Check className="mt-0.5 h-4 w-4 text-[#0E9384]" />
+                          <span>{reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      onClick={() => {
+                        if (verdict.biggestGap) selectPillar(verdict.biggestGap.p);
+                      }}
+                      className="mt-5 inline-flex items-center gap-1.5 rounded-lg border border-[#0E938433] bg-[#ECFDF6] px-3 py-1.5 text-xs font-semibold text-[#0B7A6E]"
+                    >
+                      Ver por que ela vence <ChevronDown className="h-3.5 w-3.5" />
+                    </button>
+                  </article>
+                  <div className="space-y-4 xl:col-span-4">
+                    <article className="rounded-2xl border border-[#E7EAEE] bg-white p-5">
+                      <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#0F172A]"><TriangleAlert className="h-3.5 w-3.5 text-[#B45309]" />Onde olhar com mais cuidado</p>
+                      <p className="mt-2 text-sm text-[#0F172A]">
+                        {verdict.keyRisk?.loser.ticker} exige mais atencao em {PILLAR_LABEL[verdict.keyRisk?.p ?? "Divida"]}.
+                      </p>
+                      <p className="mt-1 text-xs text-[#64748B]">Pior score identificado: {n(verdict.keyRisk?.lowestScore ?? 0, 1)}/10</p>
+                    </article>
+                    <article className="rounded-2xl border border-[#E7EAEE] bg-white p-5">
+                      <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#0F172A]"><ArrowRightLeft className="h-3.5 w-3.5 text-[#3F5F7D]" />Onde a diferenca realmente aparece</p>
+                      <p className="mt-2 text-sm text-[#0F172A]">
+                        {PILLAR_LABEL[verdict.biggestGap?.p ?? "Divida"]} e o pilar que mais separa as empresas.
+                      </p>
+                      <p className="mt-1 text-xs text-[#64748B]">Delta de score: {n(verdict.biggestGap?.delta ?? 0, 1)}/10</p>
+                    </article>
+                  </div>
+                </section>
+              ) : null}
+
+              <section className="rounded-2xl border border-[#E7EAEE] bg-white p-6">
+                <h2 className="text-[22px] font-semibold">Os 3 fatores que mais separam essas empresas</h2>
+                <p className="mt-1 text-sm text-[#475569]">Comece por aqui para decidir onde focar primeiro.</p>
+                <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                  {topPillarDiffs.map((item) => (
+                    <button
+                      key={item.p}
+                      onClick={() => selectPillar(item.p)}
+                      className={`rounded-2xl border p-4 text-left transition-all ${item.p === activePillar ? "border-[#0E9384] bg-[#F4FBF8] shadow-[0_8px_16px_rgba(14,147,132,0.08)]" : "border-[#E7EAEE] bg-white hover:border-[#0E938433]"}`}
+                    >
+                      <p className="text-sm font-semibold">{PILLAR_LABEL[item.p]}</p>{item.p === activePillar ? <p className="mt-1 text-[11px] font-medium text-[#0E9384]">Pilar em foco</p> : null}
+                      <p className="mt-2 text-[13px] font-medium text-[#0F172A]">{item.winner.ticker} leva vantagem.</p><p className="mt-1 text-xs text-[#334155]">{pillarInsight(item.p, item.winner.ticker)}</p>
+                      <p className="mt-1 text-xs text-[#475569]">
+                        Score: {n(item.da.score, 1)} ({a?.ticker}) vs {n(item.db.score, 1)} ({b?.ticker}) | Delta {n(item.delta, 1)}
+                      </p>
+                      <p className="mt-2 text-xs text-[#334155]">
+                        {trendContext(item.winnerTrend)}.
+                      </p>
+                      <div className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[#E7EAEE] bg-[#F8FAFC] px-2 py-1 text-[11px] text-[#475569]">
+                        {trendIcon(item.winnerTrend)} {trendLabel[item.winnerTrend]}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-[#E7EAEE] bg-white p-6">
+                <h2 className="text-[20px] font-semibold">Todos os pilares</h2>
+                <p className="mt-1 text-sm text-[#475569]">Explore os demais pilares em modo compacto.</p>
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  {otherPillarDiffs.map((item) => (
+                    <button
+                      key={item.p}
+                      onClick={() => selectPillar(item.p)}
+                      className={`rounded-xl border px-4 py-4 text-left transition-all ${item.p === activePillar ? "border-[#0E9384] bg-[#F4FBF8]" : "border-[#E7EAEE] bg-white hover:border-[#0E938433]"}`}
+                    >
+                      <p className="text-sm font-semibold">{PILLAR_LABEL[item.p]}</p>{item.p === activePillar ? <p className="mt-1 text-[11px] font-medium text-[#0E9384]">Pilar em foco</p> : null}
+                      <p className="mt-1 text-xs text-[#475569]">Vence: {item.winner.ticker}</p>
+                      <p className="mt-2 text-xs font-medium text-[#0F172A]">Delta {n(item.delta, 1)}/10</p><p className="mt-1 text-[11px] text-[#64748B]">Clique para abrir o detalhe</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section ref={detailRef} className="scroll-mt-[160px] rounded-2xl border border-[#E7EAEE] bg-white p-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <h2 className="text-[22px] font-semibold">Detalhe guiado do pilar: {PILLAR_LABEL[activePillar]}</h2>
+                  {a && b ? (
+                    <button onClick={() => {
+                      const m = a.pillars[activePillar].metrics[0];
+                      const mb = b.pillars[activePillar].metrics.find((x) => x.name === m.name);
+                      setEvidence({ metricName: m.name, definition: m.definition, unit: m.unit, source: m.source, aTicker: a.ticker, bTicker: b.ticker, aValue: m.value, bValue: mb?.value ?? null });
+                    }} className="inline-flex items-center gap-1.5 rounded-lg border border-[#E7EAEE] px-2.5 py-1.5 text-[11px] font-medium text-[#475569]">
+                      <FileText className="h-3.5 w-3.5" />Confirmar na fonte
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
+                  <article className="rounded-2xl border border-[#D9E2EC] bg-[#F3F7FB] p-5 xl:col-span-4">
+                    <div className="space-y-4 text-sm">
+                      {a && b ? (
+                        <div>
+                          <p className="text-[12px] font-semibold text-[#475569]">Resumo do pilar</p>
+                          <p className="mt-1.5 text-[#0F172A]">
+                            {a.pillars[activePillar].score >= b.pillars[activePillar].score ? a.ticker : b.ticker} esta melhor neste pilar hoje.
+                          </p>
+                        </div>
+                      ) : null}
+                      <div><p className="text-[12px] font-semibold text-[#475569]">O que isso quer dizer</p><p className="mt-1.5 text-[#0F172A]">{pillarCopy[activePillar].what}</p></div>
+                      <div><p className="text-[12px] font-semibold text-[#475569]">Por que isso pesa na analise</p><p className="mt-1.5 text-[#0F172A]">{pillarCopy[activePillar].why}</p></div>
+                      <div><p className="text-[12px] font-semibold text-[#475569]">O que observar com atencao</p><p className="mt-1.5 text-[#0F172A]">{pillarCopy[activePillar].how}</p></div>
+                      <div className="flex flex-wrap gap-2">{pillarCopy[activePillar].ranges.map((r) => <span key={r} className="rounded-xl border border-[#E7EAEE] bg-white px-2 py-1 text-[11px]">{r}</span>)}</div>
+                    </div>
+                  </article>
+                  <article className="rounded-2xl border border-[#E7EAEE] bg-[#F8FAFC] p-5 xl:col-span-8">
+                    {a && b ? (
+                      <>
+                        <div className="mb-3 rounded-xl border border-[#E3E8EF] bg-[#F1F5F9] px-3 py-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">Leitura do periodo</p>
+                          <p className="mt-1 text-sm font-medium text-[#334155]">
+                            {a.pillars[activePillar].score >= b.pillars[activePillar].score ? a.ticker : b.ticker} mostra trajetoria mais favoravel, enquanto{" "}
+                            {a.pillars[activePillar].score >= b.pillars[activePillar].score ? b.ticker : a.ticker} perdeu tracao relativa.
+                          </p>
+                          <p className="mt-1 text-[12px] text-[#475569]">Regra de interpretacao: {a.pillars[activePillar].thresholdLabel}</p>
+                          {latestChartDelta !== null ? <p className="mt-1 text-[12px] text-[#475569]">Delta final do periodo: {n(latestChartDelta, 1)}</p> : null}
+                        </div>
+                        <div className="mb-2 flex items-center gap-4 text-xs text-[#475569]">
+                          <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#0E9384]" />{a.ticker}</span>
+                          <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#3F5F7D]" />{b.ticker}</span>
+                        </div>
+                        <div className="h-[280px] rounded-xl border border-[#E7EAEE] bg-white p-3">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartData}>
+                              <CartesianGrid stroke="#EDF2F7" strokeDasharray="2 3" vertical={false} />
+                              <ReferenceArea y1={a.pillars[activePillar].bands.safe[0]} y2={a.pillars[activePillar].bands.safe[1]} fill="#DCFCE7" fillOpacity={0.18} />
+                              <ReferenceArea y1={a.pillars[activePillar].bands.warning[0]} y2={a.pillars[activePillar].bands.warning[1]} fill="#FFEDD5" fillOpacity={0.16} />
+                              <ReferenceArea y1={a.pillars[activePillar].bands.risk[0]} y2={a.pillars[activePillar].bands.risk[1]} fill="#FEE2E2" fillOpacity={0.18} />
+                              <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#94A3B8" }} axisLine={false} tickLine={false} />
+                              <YAxis domain={a.pillars[activePillar].domain} tick={{ fontSize: 11, fill: "#94A3B8" }} axisLine={false} tickLine={false} width={30} />
+                              <Tooltip content={({ active, payload, label }) => !active || !payload?.length ? null : <div className="rounded-lg border border-[#E7EAEE] bg-white p-2 text-xs shadow-lg"><p className="font-semibold">Ano: {label}</p>{payload.map((item) => <p key={`${item.name}-${label}`} style={{ color: item.color as string }}>{item.name}: {n(Number(item.value), 2)}</p>)}</div>} />
+                              <Line type="monotone" dataKey="a" name={a.ticker} stroke={TOKENS.companyA} strokeWidth={2.6} dot={{ r: 2 }} />
+                              <Line type="monotone" dataKey="b" name={b.ticker} stroke={TOKENS.companyB} strokeWidth={2.2} dot={{ r: 2 }} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </>
+                    ) : null}
+                  </article>
+                </div>
+              </section>
+
+              <section className="scroll-mt-[160px] rounded-2xl border border-[#E7EAEE] bg-white p-6">
+                <h2 className="text-[20px] font-semibold">Evidencias por metrica</h2>
+                <p className="mt-1 text-sm text-[#475569]">Compare numeros completos, tendencia e winner por item.</p>
+                {activePillarWinnerSummary ? <p className="mt-2 text-sm font-medium text-[#334155]">{activePillarWinnerSummary}</p> : null}
+                {a && b ? (
+                  <div className="mt-4 overflow-x-auto rounded-2xl border border-[#E7EAEE]">
+                    <table className="min-w-full divide-y divide-[#E7EAEE] text-sm">
+                      <thead className="bg-[#F8FAFC] text-xs font-semibold text-[#334155]"><tr><th className="px-3 py-3 text-left">Metrica</th><th className="px-3 py-3 text-left">{a.ticker}</th><th className="px-3 py-3 text-left">{b.ticker}</th><th className="px-3 py-3 text-left">Delta</th><th className="px-3 py-3 text-left">Winner</th><th className="px-3 py-3 text-left">Fonte</th></tr></thead>
+                      <tbody className="divide-y divide-[#E7EAEE]">
+                        {tableRows.map((row) => {
+                          const w = metricWinner(row.direction, row.a?.value ?? null, row.b?.value ?? null);
+                          const d = metricDelta(row.a?.value ?? null, row.b?.value ?? null);
+                          return (
+                            <tr key={row.name}>
+                              <td className="px-3 py-3 align-top"><p className="font-medium">{row.name}</p><p className="mt-1 text-[11px] text-[#475569]">{row.definition}</p></td>
+                              <td className="px-3 py-3 align-top"><p className={`text-[#0E9384] ${w === "a" ? "font-semibold" : "font-medium"}`}>{formatMetric(row.a?.value ?? null, row.unit)}</p>{row.a ? <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-[#64748B]">{trendIcon(row.a.trend)}{trendLabel[row.a.trend]}</p> : <p className="mt-1 text-[11px] text-[#EF4444]">Dados indisponiveis</p>}</td>
+                              <td className="px-3 py-3 align-top"><p className={`text-[#3F5F7D] ${w === "b" ? "font-semibold" : "font-medium"}`}>{formatMetric(row.b?.value ?? null, row.unit)}</p>{row.b ? <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-[#64748B]">{trendIcon(row.b.trend)}{trendLabel[row.b.trend]}</p> : <p className="mt-1 text-[11px] text-[#EF4444]">Dados indisponiveis</p>}</td>
+                              <td className="px-3 py-3 align-top font-semibold text-[#0F172A]">{d === null ? "Dados indisponiveis" : `${n(d, row.unit === "x" ? 2 : 1)} ${row.unit}`}</td>
+                              <td className="px-3 py-3 align-top">{w === "a" ? <span className="inline-flex items-center gap-1 rounded-lg bg-[#D9FBEF] px-2 py-1 text-xs font-medium text-[#0E9384]"><Crown className="h-3 w-3" />{a.ticker}</span> : w === "b" ? <span className="inline-flex items-center gap-1 rounded-lg bg-[#ECF3F9] px-2 py-1 text-xs font-medium text-[#3F5F7D]"><Check className="h-3 w-3" />{b.ticker}</span> : <span className="text-[12px] font-semibold text-[#475569]">Empate</span>}</td>
+                              <td className="px-3 py-3 align-top"><button title="Ver fonte" onClick={() => openEvidence(row)} className="inline-flex items-center gap-1 rounded-lg border border-[#E7EAEE] px-2 py-1.5 text-[11px] text-[#475569] hover:bg-[#F8FAFC]"><FileText className="h-3.5 w-3.5" />Fonte</button></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+              </section>
+              <section className="rounded-2xl border border-[#E7EAEE] bg-white p-6">
+                <h2 className="text-[20px] font-semibold">O que pode explicar essa diferenca</h2>
+                <p className="mt-1 text-sm text-[#475569]">Contexto recente + como verificamos os dados.</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-[#E7EAEE] bg-[#F8FAFC] px-3 py-2 text-[12px] text-[#475569]">
+                  <span>Atualizado em {pair.map((c) => c.updatedAt).sort((x, y) => parseDate(y) - parseDate(x))[0] ?? "-"}</span>
+                  <span>| Fontes CVM/B3/RI</span>
+                  <span>| {recentEvents.length} eventos recentes</span>
+                  <span>| {eventsOnActivePillar} impactam {PILLAR_LABEL[activePillar]}</span>
+                </div>
+                <div className="mt-4 space-y-3">
+                  <button onClick={() => setEventsOpen((v) => !v)} className="flex w-full items-center justify-between rounded-2xl border border-[#E7EAEE] bg-[#F8FAFC] px-4 py-3 text-left"><span className="text-sm font-semibold">Eventos recentes (90 dias) <span className="font-normal text-[#475569]">- {recentEvents.length} eventos - {eventsOnActivePillar} impactam {PILLAR_LABEL[activePillar]}</span></span>{eventsOpen ? <ChevronUp className="h-4 w-4 text-[#475569]" /> : <ChevronDown className="h-4 w-4 text-[#475569]" />}</button>
+                  {eventsOpen ? <div className="space-y-2">{recentEvents.length ? recentEvents.map((e) => <article key={e.id} className="rounded-2xl border border-[#E7EAEE] bg-white p-4"><div className="flex flex-wrap items-center gap-2 text-xs text-[#475569]"><span>{e.date}</span><span className={`rounded-xl px-2 py-0.5 ${e.type === "Fato relevante" ? "bg-[#FFEDD5] text-[#B45309]" : "border border-[#E7EAEE]"}`}>{e.type}</span><span className="rounded-xl border border-[#E7EAEE] px-2 py-0.5">{PILLAR_LABEL[e.impact]}</span><span className="rounded-xl border border-[#E7EAEE] px-2 py-0.5">{e.ticker}</span></div><p className="mt-2 text-sm">{e.summary}</p><button onClick={() => setEvidence({ metricName: `Evento: ${e.type}`, definition: e.summary, unit: "", source: e.source, aTicker: a?.ticker ?? "A", bTicker: b?.ticker ?? "B", aValue: null, bValue: null })} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-[#E7EAEE] px-2.5 py-1.5 text-xs text-[#475569]"><FileText className="h-3.5 w-3.5" />Ver fonte</button></article>) : <div className="rounded-2xl border border-[#E7EAEE] bg-white p-4 text-sm text-[#475569]">Nenhum evento relevante encontrado para as empresas selecionadas.</div>}</div> : null}
+                  <button onClick={() => setQualityOpen((v) => !v)} className="flex w-full items-center justify-between rounded-2xl border border-[#E7EAEE] bg-[#F8FAFC] px-4 py-3 text-left"><span className="text-sm font-semibold inline-flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${qualityTone.dot}`} />Como verificamos os dados <span className="font-normal text-[#475569]">- Atualizado em {pair.map((c) => c.updatedAt).sort((x, y) => parseDate(y) - parseDate(x))[0] ?? "-"} - Fontes: CVM/B3/RI</span></span>{qualityOpen ? <ChevronUp className="h-4 w-4 text-[#475569]" /> : <ChevronDown className="h-4 w-4 text-[#475569]" />}</button>
+                  {qualityOpen ? <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">{pair.map((c, i) => <article key={c.ticker} className="rounded-2xl border border-[#E7EAEE] bg-white p-4 text-sm"><p className="font-semibold">{i === 0 ? "Empresa A" : "Empresa B"}: {c.ticker}</p><p className="mt-1 text-[#475569]">Fonte primaria: {c.primarySource}</p><p className="mt-1 text-[#475569]">Ultima atualizacao: {c.updatedAt}</p><p className="mt-2 text-xs text-[#475569]" title="Confiabilidade baseada em cobertura, recorrencia e completude">Confianca: {c.confidence}</p>{c.gaps.length ? <div className="mt-2 rounded-xl border border-[#FDE68A] bg-[#FFF7ED] px-3 py-2 text-xs text-[#B45309]"><p className="inline-flex items-center gap-1 font-medium"><TriangleAlert className="h-3.5 w-3.5" />Gap identificado</p><p className="mt-1.5 text-[#0F172A]">{c.gaps.join(" ")}</p></div> : <div className="mt-2 rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-3 py-2 text-xs text-[#166534]">Nenhum gap relevante reportado.</div>}</article>)}</div> : null}
+                </div>
+              </section>
+            </div>
+          )}
+
+          <p className="mt-8 text-xs text-[#64748B]">Conteudo educacional. Nao constitui recomendacao de compra ou venda.</p>
+        </div>
+      </main>
+      {toast ? <div className="fixed bottom-5 right-5 z-50 rounded-xl border border-[#0E938433] bg-[#D9FBEF] px-3 py-2 text-xs font-medium text-[#0B7A6E] shadow-lg">{toast}</div> : null}
+      <EvidenceDrawer data={evidence} onClose={() => setEvidence(null)} />
+    </div>
+  );
 }
 
 export default ComparePage;

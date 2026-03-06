@@ -2,15 +2,14 @@
 
 import { useMemo, useState } from "react";
 import {
-  AlertTriangle,
   Bell,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   MoreHorizontal,
   Plus,
   Search,
   Settings,
-  Star,
   GitCompare,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -53,7 +52,7 @@ type WatchlistCompany = {
   sector: string;
   scores: number[];
   lastChangeDays: number;
-  freshness: "Atual" | "Desatualizado" | "Falha" | "Sem dados";
+  freshness: "Atual" | "Falha" | "Sem dados";
   volatility?: "Baixa" | "Moderada" | "Alta";
   attentionPillar: Pillar;
   tags: string[];
@@ -88,8 +87,8 @@ const priorityItems: PriorityItem[] = [
     ticker: "MRVE3",
     sector: "Construção",
     badge: "Atenção",
-    change: "Dados antigos no pilar Margens (último 2T25).",
-    why: "Sem atualização recente, o diagnóstico pode estar incompleto.",
+    change: "Margens pressionadas no último trimestre reportado.",
+    why: "Pode limitar recuperação de resultado e pede monitoramento de custos.",
     evidence: "Fonte: CVM • ITR 2T25 • 12/11",
     pillar: "Margens",
     evidenceId: "margens-1",
@@ -241,7 +240,7 @@ const watchlistCompanies: WatchlistCompany[] = [
     sector: "Consumo",
     scores: [42, 58, 46, 52, 48],
     lastChangeDays: 1,
-    freshness: "Desatualizado",
+    freshness: "Falha",
     volatility: "Alta",
     attentionPillar: "Dívida",
     tags: ["Cíclica"],
@@ -263,7 +262,7 @@ const watchlistCompanies: WatchlistCompany[] = [
     sector: "Construção",
     scores: [32, 44, 30, 36, 40],
     lastChangeDays: 12,
-    freshness: "Desatualizado",
+    freshness: "Falha",
     volatility: "Alta",
     attentionPillar: "Dívida",
     tags: ["Risco"],
@@ -345,8 +344,8 @@ const alerts: AlertItem[] = [
   },
   {
     id: "a2",
-    title: "Dados antigos (MRVE3)",
-    summary: "Última atualização acima de 60 dias.",
+    title: "Margens em atenção (MRVE3)",
+    summary: "Pressão de custos manteve margens abaixo da média setorial.",
     time: "Ontem • 19:40",
     severity: "Atenção",
   },
@@ -379,9 +378,10 @@ const alertStyles: Record<AlertItem["severity"], string> = {
   "Saudável": "bg-emerald-100 text-emerald-900 border-emerald-300",
 };
 
-const freshnessBadgeStyles: Record<"Atualizado" | "Desatualizado", string> = {
+const freshnessBadgeStyles: Record<"Atualizado" | "Falha de dados" | "Sem dados", string> = {
   Atualizado: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  Desatualizado: "bg-amber-50 text-amber-700 border-amber-100",
+  "Falha de dados": "bg-rose-50 text-rose-700 border-rose-100",
+  "Sem dados": "bg-neutral-100 text-neutral-700 border-neutral-200",
 };
 
 const pillarTagStyles: Record<Pillar, string> = {
@@ -389,41 +389,37 @@ const pillarTagStyles: Record<Pillar, string> = {
   Caixa: "bg-amber-50 text-amber-700 border-amber-100",
   Margens: "bg-emerald-50 text-emerald-700 border-emerald-100",
   Retorno: "bg-sky-50 text-sky-700 border-sky-100",
-  Proventos: "bg-violet-50 text-violet-700 border-violet-100",
+  Proventos: "bg-teal-50 text-teal-700 border-teal-100",
 };
 
-const rangeOptions: Array<"7d" | "30d" | "90d"> = ["7d", "30d", "90d"];
+const rangeOptions: Array<"7d" | "30d" | "90d" | "Todos"> = ["7d", "30d", "90d", "Todos"];
 
 export function WatchlistPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"updates" | "list">("updates");
-  const [activeRange, setActiveRange] = useState<"7d" | "30d" | "90d">("30d");
+  const [activeRange, setActiveRange] = useState<"7d" | "30d" | "90d" | "Todos">("30d");
   const [activePillars, setActivePillars] = useState<Pillar[]>([]);
   const [severityFilter, setSeverityFilter] = useState<"Todos" | "Risco" | "Atenção" | "Saudável">("Todos");
   const [sourceFilter, setSourceFilter] = useState<"Todas" | "CVM" | "B3" | "RI">("Todas");
+  const [showAdvancedFeedFilters, setShowAdvancedFeedFilters] = useState(false);
   const [listSearch, setListSearch] = useState("");
   const [sortBy, setSortBy] = useState("Mudou recentemente");
   const [filters, setFilters] = useState({
     sector: "Todos",
     tags: "Todos",
-    freshness: "Todos",
     pillar: "Todos",
   });
   const [showListFilters, setShowListFilters] = useState(false);
-  const [listSeverityFilter, setListSeverityFilter] = useState<"Todos" | "Ação agora" | "Risco" | "Atenção" | "Saudável">("Todos");
+  const [listSeverityFilter, setListSeverityFilter] = useState<"Todos" | "Risco" | "Atenção" | "Saudável">("Todos");
   const [listSourceFilter, setListSourceFilter] = useState<"Todas" | "CVM" | "B3" | "RI">("Todas");
   const [listDensity, setListDensity] = useState<"Compacto" | "Detalhado">("Compacto");
   const [unseenOnly, setUnseenOnly] = useState(true);
   const [seenTickers, setSeenTickers] = useState<string[]>([]);
-  const [hideStaleCompanies, setHideStaleCompanies] = useState(true);
   const [showAlertActionOnly, setShowAlertActionOnly] = useState(true);
   const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
   const [quickActionsTicker, setQuickActionsTicker] = useState<string | null>(null);
 
   const [uiState] = useState<"ready" | "loading" | "empty">("ready");
-
-  const staleCompanies = watchlistCompanies.filter((company) => company.freshness === "Desatualizado");
-  const staleCompaniesCount = staleCompanies.length;
 
   const getStatusFromScores = (scores: number[]): "Risco" | "Atenção" | "Saudável" => {
     const minScore = Math.min(...scores);
@@ -449,7 +445,7 @@ export function WatchlistPage() {
 
   const filteredFeedItems = useMemo(() => {
     return feedItems.filter((item) => {
-      if (activeRange && item.range !== activeRange) return false;
+      if (activeRange !== "Todos" && item.range !== activeRange) return false;
       if (activePillars.length > 0 && !activePillars.includes(item.pillar)) return false;
       if (severityFilter !== "Todos" && item.severity !== severityFilter) return false;
       if (sourceFilter !== "Todas" && item.source !== sourceFilter) return false;
@@ -469,11 +465,8 @@ export function WatchlistPage() {
         if (unseenOnly && seenTickers.includes(company.ticker)) return false;
         if (filters.sector !== "Todos" && company.sector !== filters.sector) return false;
         if (filters.tags !== "Todos" && !company.tags.includes(filters.tags)) return false;
-        if (filters.freshness !== "Todos" && company.freshness !== filters.freshness) return false;
-        if (hideStaleCompanies && filters.freshness === "Todos" && company.freshness === "Desatualizado") return false;
         if (filters.pillar !== "Todos" && company.attentionPillar !== filters.pillar) return false;
-        if (listSeverityFilter === "Ação agora" && companyStatus === "Saudável") return false;
-        if (listSeverityFilter !== "Todos" && listSeverityFilter !== "Ação agora" && companyStatus !== listSeverityFilter) return false;
+        if (listSeverityFilter !== "Todos" && companyStatus !== listSeverityFilter) return false;
         if (listSourceFilter !== "Todas" && companySource !== listSourceFilter) return false;
         return true;
       })
@@ -488,19 +481,14 @@ export function WatchlistPage() {
           const scoreB = b.scores.reduce((sum, value) => sum + value, 0);
           return scoreB - scoreA;
         }
-        if (sortBy === "Dados desatualizados primeiro") {
-          if (a.freshness === "Desatualizado" && b.freshness !== "Desatualizado") return -1;
-          if (b.freshness === "Desatualizado" && a.freshness !== "Desatualizado") return 1;
-        }
         return 0;
       });
-  }, [filters, hideStaleCompanies, listSearch, listSeverityFilter, listSourceFilter, seenTickers, sortBy, unseenOnly]);
+  }, [filters, listSearch, listSeverityFilter, listSourceFilter, seenTickers, sortBy, unseenOnly]);
 
   const activeListFiltersCount = useMemo(() => {
     let count = 0;
     if (filters.sector !== "Todos") count += 1;
     if (filters.tags !== "Todos") count += 1;
-    if (filters.freshness !== "Todos") count += 1;
     if (filters.pillar !== "Todos") count += 1;
     if (listSeverityFilter !== "Todos") count += 1;
     if (listSourceFilter !== "Todas") count += 1;
@@ -511,17 +499,9 @@ export function WatchlistPage() {
     const status = getStatusFromScores(company.scores);
     return status === "Risco" || status === "Atenção";
   }).length;
+  const summaryRiskCount = watchlistCompanies.filter((company) => getStatusFromScores(company.scores) === "Risco").length;
   const summaryChanges30dCount = watchlistCompanies.filter((company) => company.lastChangeDays <= 30).length;
-
-  const alertsToShow = showAlertActionOnly
-    ? alerts.filter((alert) => alert.severity !== "Saudável")
-    : alerts;
-
-  const openStaleInList = () => {
-    setActiveTab("list");
-    setHideStaleCompanies(false);
-    setFilters((prev) => ({ ...prev, freshness: "Desatualizado" }));
-  };
+  const alertsToShow = showAlertActionOnly ? alerts.filter((alert) => alert.severity !== "Saudável") : alerts;
 
   const pillarToSlug = (pillar: Pillar) => {
     if (pillar === "Dívida") return "divida";
@@ -569,13 +549,12 @@ export function WatchlistPage() {
 
   const applySummaryAttentionFilter = () => {
     setActiveTab("list");
-    setListSeverityFilter("Ação agora");
+    setListSeverityFilter("Atenção");
   };
 
-  const applySummaryStaleFilter = () => {
+  const applySummaryRiskFilter = () => {
     setActiveTab("list");
-    setHideStaleCompanies(false);
-    setFilters((prev) => ({ ...prev, freshness: "Desatualizado" }));
+    setListSeverityFilter("Risco");
   };
 
   const applySummaryChangesWindow = () => {
@@ -583,11 +562,17 @@ export function WatchlistPage() {
     setActiveRange("30d");
   };
 
+  const toggleSeenTicker = (ticker: string) => {
+    setSeenTickers((prev) => (prev.includes(ticker) ? prev.filter((item) => item !== ticker) : [...prev, ticker]));
+  };
+
+  const getFeedCTA = (item: FeedItem) => (item.source === "CVM" ? "Ver evidência" : "Ver análise");
+
   return (
     <div className="min-h-screen bg-neutral-50">
       <Sidebar currentPage="watchlist" />
 
-      <header className="fixed top-0 left-64 right-0 h-16 bg-white border-b border-neutral-200 z-10">
+      <header className="fixed top-0 left-[88px] right-0 h-16 bg-white border-b border-neutral-200 z-10">
         <div className="h-full px-8 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-medium text-neutral-900">Watchlist</span>
@@ -599,11 +584,11 @@ export function WatchlistPage() {
               <input
                 type="text"
                 placeholder="Buscar empresa ou ticker..."
-                className="w-80 pl-10 pr-4 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-sm text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-mint-500 focus:border-transparent transition-all"
+                className="w-80 pl-10 pr-4 py-2 bg-neutral-50/70 border border-neutral-100 rounded-xl text-sm text-neutral-800 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-mint-200 focus:border-transparent transition-all"
               />
             </div>
 
-            <button className="px-4 py-2 rounded-xl bg-mint-500 text-white text-sm font-medium hover:bg-mint-600">
+            <button className="px-4 py-2 rounded-xl border border-neutral-200 bg-white text-neutral-700 text-sm font-medium hover:bg-neutral-50">
               <Plus className="w-4 h-4 inline-block mr-2" />
               Adicionar empresa
             </button>
@@ -631,7 +616,7 @@ export function WatchlistPage() {
         </div>
       </header>
 
-      <main className="ml-64 pt-16">
+      <main className="ml-[88px] pt-16">
         <div className="px-8 py-8">
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-semibold text-neutral-900">Watchlist</h1>
@@ -639,7 +624,7 @@ export function WatchlistPage() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <section className="lg:col-span-8 space-y-4">
+            <section className="lg:col-span-9 space-y-4">
               <div className="flex items-center gap-2">
                 {[
                   { key: "updates", label: "Atualizações" },
@@ -657,26 +642,6 @@ export function WatchlistPage() {
                     {tab.label}
                   </button>
                 ))}
-              </div>
-
-              <div className="flex flex-col gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-800 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  <button onClick={openStaleInList} className="font-semibold hover:text-amber-900">
-                    {staleCompaniesCount} dados desatualizados
-                  </button>
-                  <span className="text-amber-700">na watchlist</span>
-                </div>
-                <button
-                  onClick={() => setHideStaleCompanies((prev) => !prev)}
-                  className={`inline-flex items-center rounded-full border px-3 py-1 font-medium ${
-                    hideStaleCompanies
-                      ? "border-mint-200 bg-mint-50 text-mint-700"
-                      : "border-amber-200 bg-white text-amber-800"
-                  }`}
-                >
-                  Ocultar desatualizadas: {hideStaleCompanies ? "ON" : "OFF"}
-                </button>
               </div>
 
               {uiState === "empty" ? (
@@ -740,7 +705,7 @@ export function WatchlistPage() {
                     </div>
 
                     <div className="space-y-2">
-                      {priorityItems.slice(0, 3).map((item) => (
+                      {priorityItems.slice(0, 3).map((item, index) => (
                         <div
                           key={item.id}
                           role="button"
@@ -752,8 +717,16 @@ export function WatchlistPage() {
                               navigate(buildCompanyDeepLink(item.ticker, item.pillar));
                             }
                           }}
-                          className={`rounded-xl border border-neutral-200 border-l-4 bg-neutral-50 p-3 flex flex-col gap-2 cursor-pointer transition-colors ${clickableItemStyles[item.badge]}`}
+                          className={`rounded-xl border border-neutral-200 border-l-4 bg-neutral-50 p-3 flex flex-col gap-2 cursor-pointer transition-colors ${clickableItemStyles[item.badge]} ${
+                            index === 0 ? "border-mint-200 bg-white shadow-[0_6px_16px_rgba(16,185,129,0.08)]" : ""
+                          }`}
                         >
+                          {index === 0 && (
+                            <div className="mb-1 flex items-center justify-between rounded-lg border border-mint-200 bg-mint-50 px-2 py-1 text-[11px] text-mint-800">
+                              <span className="font-semibold">Comece por aqui</span>
+                              <span className="rounded-full border border-mint-300 bg-white px-2 py-0.5 font-semibold">Prioridade 1</span>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between gap-3">
                             <div>
                               <p className="text-sm font-semibold text-neutral-900">
@@ -783,7 +756,7 @@ export function WatchlistPage() {
                               onClick={(event) => event.stopPropagation()}
                               className="inline-flex items-center rounded-md border border-mint-200 bg-mint-50 px-2 py-1 text-xs font-medium text-mint-700 hover:text-neutral-900"
                             >
-                              Ver evidência
+                              {getFeedCTA(item)}
                             </Link>
                           </div>
                         </div>
@@ -801,8 +774,9 @@ export function WatchlistPage() {
                     </div>
 
                     <div className="sticky top-20 z-0 bg-white">
-                      <div className="flex flex-wrap items-center gap-2 pb-4 border-b border-neutral-200">
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 pb-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-medium text-neutral-500">Período:</span>
                           {rangeOptions.map((range) => (
                             <button
                               key={range}
@@ -813,13 +787,14 @@ export function WatchlistPage() {
                                   : "border-neutral-200 text-neutral-600"
                               }`}
                             >
-                              {range}
+                              {range === "Todos" ? "Todos" : range}
                             </button>
                           ))}
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          {(["Todos", "Risco", "Atenção", "Saudável"] as const).map((option) => (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-medium text-neutral-500">Severidade:</span>
+                          {(["Risco", "Atenção", "Saudável"] as const).map((option) => (
                             <button
                               key={option}
                               onClick={() => setSeverityFilter(option)}
@@ -832,40 +807,72 @@ export function WatchlistPage() {
                               {option}
                             </button>
                           ))}
+                          <button
+                            onClick={() => setSeverityFilter("Todos")}
+                            className={`px-3 py-2 rounded-xl text-xs font-medium border ${
+                              severityFilter === "Todos"
+                                ? "border-mint-200 bg-mint-50 text-mint-700"
+                                : "border-neutral-200 text-neutral-600"
+                            }`}
+                          >
+                            Todas
+                          </button>
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          {(["Todas", "CVM", "B3", "RI"] as const).map((option) => (
-                            <button
-                              key={option}
-                              onClick={() => setSourceFilter(option)}
-                              className={`px-3 py-2 rounded-xl text-xs font-medium border ${
-                                sourceFilter === option
-                                  ? "border-mint-200 bg-mint-50 text-mint-700"
-                                  : "border-neutral-200 text-neutral-600"
-                              }`}
-                            >
-                              Fonte: {option}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          {pillars.map((pillar) => (
-                            <button
-                              key={pillar}
-                              onClick={() => togglePillar(pillar)}
-                              className={`px-3 py-2 rounded-xl text-xs font-medium border ${
-                                activePillars.includes(pillar)
-                                  ? "border-mint-200 bg-mint-50 text-mint-700"
-                                  : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"
-                              }`}
-                            >
-                              {pillar}
-                            </button>
-                          ))}
-                        </div>
+                        <button
+                          onClick={() => setShowAdvancedFeedFilters((prev) => !prev)}
+                          className={`px-3 py-2 rounded-xl text-xs font-medium border ${
+                            showAdvancedFeedFilters
+                              ? "border-mint-200 bg-mint-50 text-mint-700"
+                              : "border-neutral-200 text-neutral-600"
+                          }`}
+                        >
+                          Filtros avançados: {showAdvancedFeedFilters ? "ON" : "OFF"}
+                        </button>
                       </div>
+
+                      <div className="border-y border-neutral-200 py-2 text-xs text-neutral-600">
+                        {filteredFeedItems.length} atualizações · Fonte: {sourceFilter.toLowerCase()}
+                      </div>
+
+                      {showAdvancedFeedFilters && (
+                        <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50 p-2.5">
+                          <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-medium text-neutral-500">Fonte:</span>
+                            {(["Todas", "CVM", "B3", "RI"] as const).map((option) => (
+                              <button
+                                key={option}
+                                onClick={() => setSourceFilter(option)}
+                                className={`px-3 py-2 rounded-xl text-xs font-medium border ${
+                                  sourceFilter === option
+                                    ? "border-mint-200 bg-mint-50 text-mint-700"
+                                    : "border-neutral-200 text-neutral-600"
+                                }`}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <span className="self-center text-[11px] font-medium text-neutral-500">Pilar:</span>
+                            {pillars.map((pillar) => (
+                              <button
+                                key={pillar}
+                                onClick={() => togglePillar(pillar)}
+                                className={`px-3 py-2 rounded-xl text-xs font-medium border ${
+                                  activePillars.includes(pillar)
+                                    ? "border-mint-200 bg-mint-50 text-mint-700"
+                                    : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                                }`}
+                              >
+                                {pillar}
+                              </button>
+                            ))}
+                          </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-4 space-y-3">
@@ -884,7 +891,7 @@ export function WatchlistPage() {
                           className={`rounded-xl border border-neutral-200 border-l-4 bg-neutral-50 p-3 space-y-2 cursor-pointer transition-colors ${clickableItemStyles[item.severity]}`}
                         >
                           <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold text-neutral-900">{item.headline}</h3>
+                            <h3 className="text-sm font-semibold text-neutral-950">{item.headline}</h3>
                             <div className="flex items-center gap-2">
                               <span
                                 className={`px-2 py-1 rounded-full border text-[11px] font-medium ${badgeStyles[item.severity]}`}
@@ -898,9 +905,11 @@ export function WatchlistPage() {
                               </span>
                             </div>
                           </div>
-                          <div className="text-sm text-neutral-700">
+                          <div className="text-sm text-neutral-800">
                             <GlossaryText text={item.detail} />
-                            <GlossaryText text={item.detailTwo} />
+                            <p className="mt-1 text-neutral-700">
+                              <GlossaryText text={item.detailTwo} />
+                            </p>
                           </div>
                           <div className="flex items-center justify-between text-[11px] text-neutral-600">
                             <span>{item.evidence}</span>
@@ -909,7 +918,7 @@ export function WatchlistPage() {
                               onClick={(event) => event.stopPropagation()}
                               className="inline-flex items-center rounded-md border border-mint-200 bg-mint-50 px-2 py-1 text-xs font-medium text-mint-700 hover:text-neutral-900"
                             >
-                              Ver evidência
+                              Ver análise
                             </Link>
                           </div>
                         </div>
@@ -921,7 +930,7 @@ export function WatchlistPage() {
                 <div className="space-y-4">
                   <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-                      <div className="relative flex-1">
+                      <div className="relative flex-[1.8]">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                         <input
                           type="text"
@@ -931,26 +940,25 @@ export function WatchlistPage() {
                           className="w-full pl-10 pr-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-700 focus:outline-none focus:ring-2 focus:ring-mint-100"
                         />
                       </div>
-                      <div className="relative">
+                      <div className="relative flex-1">
                         <select
                           value={sortBy}
                           onChange={(event) => setSortBy(event.target.value)}
-                          className="px-3 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-600 bg-white focus:outline-none focus:ring-2 focus:ring-mint-100"
+                          className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-600 bg-white focus:outline-none focus:ring-2 focus:ring-mint-100"
                         >
                           {[
                             "Mudou recentemente",
                             "Atenção primeiro",
                             "Melhor qualidade (score geral)",
-                            "Dados desatualizados primeiro",
-                          ].map((option) => (
-                            <option key={option} value={option}>
-                              Ordenar: {option}
+                              ].map((option) => (
+                                <option key={option} value={option}>
+                                  Ordenar: {option}
                             </option>
                           ))}
                         </select>
                         <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {(["Compacto", "Detalhado"] as const).map((mode) => (
                           <button
                             key={mode}
@@ -958,31 +966,31 @@ export function WatchlistPage() {
                             className={`px-3 py-2 rounded-xl text-xs font-medium border ${
                               listDensity === mode
                                 ? "border-mint-200 bg-mint-50 text-mint-700"
-                                : "border-neutral-200 text-neutral-600"
+                                : "border-neutral-200 bg-white text-neutral-600"
                             }`}
                           >
                             {mode}
                           </button>
                         ))}
                         <button
-                          onClick={() => setUnseenOnly((prev) => !prev)}
-                          className={`px-3 py-2 rounded-xl text-xs font-medium border ${
-                            unseenOnly
-                              ? "border-mint-200 bg-mint-50 text-mint-700"
-                              : "border-neutral-200 text-neutral-600"
-                          }`}
-                        >
-                          Não vistos
-                        </button>
-                        <button
                           onClick={() => setShowListFilters((prev) => !prev)}
                           className={`px-3 py-2 rounded-xl text-xs font-medium border ${
                             showListFilters
-                              ? "border-mint-200 bg-mint-50 text-mint-700"
-                              : "border-neutral-200 text-neutral-600"
+                              ? "border-neutral-300 bg-neutral-100 text-neutral-700"
+                              : "border-neutral-200 bg-white text-neutral-600"
                           }`}
                         >
                           Filtros ({activeListFiltersCount})
+                        </button>
+                        <button
+                          onClick={() => setUnseenOnly((prev) => !prev)}
+                          className={`px-3 py-2 rounded-xl text-xs font-medium border ${
+                            unseenOnly
+                              ? "border-neutral-300 bg-neutral-100 text-neutral-700"
+                              : "border-neutral-200 bg-white text-neutral-600"
+                          }`}
+                        >
+                          Não vistos
                         </button>
                       </div>
                     </div>
@@ -999,11 +1007,6 @@ export function WatchlistPage() {
                             label: "Tags",
                             key: "tags",
                             options: ["Todos", "Qualidade", "Defensiva", "Dividendos", "Risco", "Cíclica", "Renda", "Atenção"],
-                          },
-                          {
-                            label: "Frescor",
-                            key: "freshness",
-                            options: ["Todos", "Atual", "Desatualizado", "Falha", "Sem dados"],
                           },
                           {
                             label: "Pilar em atenção",
@@ -1034,7 +1037,7 @@ export function WatchlistPage() {
                             onChange={(event) => setListSeverityFilter(event.target.value as typeof listSeverityFilter)}
                             className="w-full px-3 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-700 bg-white focus:outline-none focus:ring-2 focus:ring-mint-100"
                           >
-                            {["Todos", "Ação agora", "Risco", "Atenção", "Saudável"].map((option) => (
+                            {["Todos", "Risco", "Atenção", "Saudável"].map((option) => (
                               <option key={option} value={option}>
                                 Severidade: {option}
                               </option>
@@ -1068,7 +1071,12 @@ export function WatchlistPage() {
                         company.scores.reduce((sum, value) => sum + value, 0) / company.scores.length
                       );
                       const status = getStatusFromScores(company.scores);
-                      const freshnessBadge = company.freshness === "Atual" ? "Atualizado" : "Desatualizado";
+                      const freshnessBadge =
+                        company.freshness === "Atual"
+                          ? "Atualizado"
+                          : company.freshness === "Falha"
+                            ? "Falha de dados"
+                            : "Sem dados";
                       const attentionSummary = getAttentionSummary(company);
                       const whyItMatters = getWhyItMatters(company);
                       return (
@@ -1120,22 +1128,37 @@ export function WatchlistPage() {
                                 Fonte: {sourceByTicker[company.ticker] ?? "CVM"} • Atualizado em {company.lastChangeDays}d
                               </p>
                             </div>
-                            <div className="relative flex items-center gap-1.5">
+                            <div className="relative flex items-center gap-1.5 flex-wrap justify-end">
                               <button
-                                title="Favoritar"
-                                aria-label="Favoritar"
-                                onClick={(event) => event.stopPropagation()}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  navigate(buildCompanyDeepLink(company.ticker, company.attentionPillar));
+                                }}
+                                className="inline-flex items-center rounded-lg bg-mint-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-mint-600 whitespace-nowrap"
                               >
-                                <Star className="h-3.5 w-3.5" />
+                                Ver detalhes
                               </button>
-                              <button
-                                title="Criar alerta"
-                                aria-label="Criar alerta"
+                              <Link
+                                to={buildCompanyDeepLink(company.ticker, company.attentionPillar, defaultEvidenceByPillar[company.attentionPillar])}
                                 onClick={(event) => event.stopPropagation()}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
+                                className="inline-flex items-center rounded-md border border-mint-200 bg-mint-50 px-2 py-1 text-xs font-medium text-mint-700 hover:text-neutral-900 whitespace-nowrap"
                               >
-                                <Bell className="h-3.5 w-3.5" />
+                                Ver evidência
+                              </Link>
+                              <button
+                                title={seenTickers.includes(company.ticker) ? "Marcar como não visto" : "Marcar visto"}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleSeenTicker(company.ticker);
+                                }}
+                                className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs whitespace-nowrap ${
+                                  seenTickers.includes(company.ticker)
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:text-neutral-800"
+                                }`}
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {seenTickers.includes(company.ticker) ? "Visto" : "Marcar visto"}
                               </button>
                               <button
                                 title="Mais ações"
@@ -1144,7 +1167,7 @@ export function WatchlistPage() {
                                   event.stopPropagation();
                                   setQuickActionsTicker((prev) => (prev === company.ticker ? null : company.ticker));
                                 }}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-neutral-200 bg-neutral-50 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
                               >
                                 <MoreHorizontal className="h-3.5 w-3.5" />
                               </button>
@@ -1154,44 +1177,42 @@ export function WatchlistPage() {
                                   className="absolute right-0 top-8 z-10 w-44 rounded-lg border border-neutral-200 bg-white p-1.5 shadow-lg"
                                 >
                                   <button
-                                    title="Abrir análise"
+                                    title="Favoritar"
                                     onClick={() => {
                                       setQuickActionsTicker(null);
-                                      navigate(buildCompanyDeepLink(company.ticker, company.attentionPillar));
                                     }}
                                     className="w-full rounded-md px-2 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-50"
                                   >
-                                    Abrir análise
+                                    Favoritar
                                   </button>
                                   <button
                                     title="Criar alerta"
                                     onClick={() => {
                                       setQuickActionsTicker(null);
-                                      navigate(buildCompanyDeepLink(company.ticker, company.attentionPillar, defaultEvidenceByPillar[company.attentionPillar]));
                                     }}
                                     className="w-full rounded-md px-2 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-50"
                                   >
                                     Criar alerta
                                   </button>
                                   <button
-                                    title="Adicionar tag/nota"
+                                    title={isExpanded ? "Recolher detalhes" : "Expandir detalhes"}
                                     onClick={() => {
                                       setQuickActionsTicker(null);
-                                      setExpandedTicker(company.ticker);
+                                      setExpandedTicker((prev) => (prev === company.ticker ? null : company.ticker));
                                     }}
                                     className="w-full rounded-md px-2 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-50"
                                   >
-                                    Adicionar tag/nota
+                                    {isExpanded ? "Recolher detalhes" : "Expandir detalhes"}
                                   </button>
                                   <button
-                                    title="Marcar como visto"
+                                    title="Marcar visto"
                                     onClick={() => {
                                       setQuickActionsTicker(null);
-                                      setSeenTickers((prev) => (prev.includes(company.ticker) ? prev : [...prev, company.ticker]));
+                                      toggleSeenTicker(company.ticker);
                                     }}
                                     className="w-full rounded-md px-2 py-1.5 text-left text-xs text-neutral-700 hover:bg-neutral-50"
                                   >
-                                    Marcar como visto
+                                    {seenTickers.includes(company.ticker) ? "Marcar como não visto" : "Marcar visto"}
                                   </button>
                                   <button
                                     title="Remover da watchlist"
@@ -1202,34 +1223,6 @@ export function WatchlistPage() {
                                   </button>
                                 </div>
                               )}
-                              <Link
-                                to={buildCompanyDeepLink(company.ticker, company.attentionPillar, defaultEvidenceByPillar[company.attentionPillar])}
-                                onClick={(event) => event.stopPropagation()}
-                                className="inline-flex items-center rounded-md border border-mint-200 bg-mint-50 px-2 py-1 text-xs font-medium text-mint-700 hover:text-neutral-900 whitespace-nowrap"
-                              >
-                                Ver evidência
-                              </Link>
-                              {listDensity === "Compacto" && (
-                                <button
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setExpandedTicker((prev) => (prev === company.ticker ? null : company.ticker));
-                                  }}
-                                  className="text-xs text-mint-700 font-medium hover:text-neutral-900 whitespace-nowrap"
-                                >
-                                  {isExpanded ? "Ocultar detalhes" : "Ver detalhes"}
-                                </button>
-                              )}
-                              <button
-                                title="Marcar como visto"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setSeenTickers((prev) => (prev.includes(company.ticker) ? prev : [...prev, company.ticker]));
-                                }}
-                                className="text-xs text-neutral-600 hover:text-neutral-900 whitespace-nowrap"
-                              >
-                                Visto
-                              </button>
                             </div>
                           </div>
 
@@ -1259,10 +1252,6 @@ export function WatchlistPage() {
                                   <span>Última mudança</span>
                                   <span>{company.lastChangeDays} dias</span>
                                 </div>
-                                <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-2 py-1.5">
-                                  <span>Dados</span>
-                                  <span>{company.freshness}</span>
-                                </div>
                                 {company.volatility && (
                                   <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-2 py-1.5 sm:col-span-2">
                                     <span>Volatilidade</span>
@@ -1280,56 +1269,58 @@ export function WatchlistPage() {
               )}
             </section>
 
-            <aside className="lg:col-span-4 space-y-4">
+            <aside className="lg:col-span-3 space-y-4">
               <div className="lg:sticky lg:top-20 space-y-4">
-              <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4">
+              <div className="bg-white rounded-2xl border border-neutral-200 p-2.5">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold text-neutral-900">Resumo da Watchlist em 30s</h3>
                   <span className="text-[11px] text-neutral-400">Hoje</span>
                 </div>
-                <p className="text-sm text-neutral-700">Use os atalhos abaixo para focar no que pede ação agora.</p>
-                <div className="mt-4 grid grid-cols-3 gap-2 text-xs text-neutral-600">
+                <p className="text-[11px] text-neutral-700">
+                  Hoje sua watchlist está mais concentrada em sinais de atenção do que em sinais saudáveis.
+                </p>
+                <div className="mt-1.5 grid grid-cols-3 gap-1 text-[11px] text-neutral-600">
                   <button
                     onClick={applySummaryAttentionFilter}
-                    className="rounded-xl border border-neutral-200 bg-neutral-50 p-2 text-center hover:bg-neutral-100 transition-colors"
+                    className="rounded-md border border-neutral-200 bg-neutral-50 p-1 text-center hover:bg-neutral-100 transition-colors"
                   >
-                    <p className="text-lg font-semibold text-neutral-900">{summaryAttentionCount}</p>
+                    <p className="text-sm font-semibold text-neutral-900">{summaryAttentionCount}</p>
                     <p>em atenção</p>
                   </button>
                   <button
-                    onClick={applySummaryStaleFilter}
-                    className="rounded-xl border border-neutral-200 bg-neutral-50 p-2 text-center hover:bg-neutral-100 transition-colors"
+                    onClick={applySummaryRiskFilter}
+                    className="rounded-md border border-neutral-200 bg-neutral-50 p-1 text-center hover:bg-neutral-100 transition-colors"
                   >
-                    <p className="text-lg font-semibold text-neutral-900">{staleCompaniesCount}</p>
-                    <p>desatualizadas</p>
+                    <p className="text-sm font-semibold text-neutral-900">{summaryRiskCount}</p>
+                    <p>em risco</p>
                   </button>
                   <button
                     onClick={applySummaryChangesWindow}
-                    className="rounded-xl border border-neutral-200 bg-neutral-50 p-2 text-center hover:bg-neutral-100 transition-colors"
+                    className="rounded-md border border-neutral-200 bg-neutral-50 p-1 text-center hover:bg-neutral-100 transition-colors"
                   >
-                    <p className="text-lg font-semibold text-neutral-900">{summaryChanges30dCount}</p>
+                    <p className="text-sm font-semibold text-neutral-900">{summaryChanges30dCount}</p>
                     <p>mudanças 30d</p>
                   </button>
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4">
+              <div className="bg-white rounded-2xl border border-neutral-200 p-4">
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-neutral-900">Alertas</h3>
                   <button
                     onClick={() => setShowAlertActionOnly((prev) => !prev)}
-                    className={`text-xs px-2 py-1 rounded-full border ${
-                      showAlertActionOnly
-                        ? "border-mint-200 bg-mint-50 text-mint-700"
-                        : "border-neutral-200 text-neutral-600"
-                    }`}
-                  >
-                    Ação agora
+                  className={`text-xs px-2 py-1 rounded-full border ${
+                    showAlertActionOnly
+                      ? "border-mint-200 bg-mint-50 text-mint-700"
+                      : "border-neutral-200 text-neutral-600"
+                  }`}
+                >
+                    {showAlertActionOnly ? "Filtro ativo · Ação agora" : "Mostrando todos"}
                   </button>
                 </div>
                 <div className="space-y-2">
                   {alertsToShow.map((alert) => (
-                    <div key={alert.id} className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                    <div key={alert.id} className={`rounded-xl border p-3 ${alert.severity === "Risco" ? "border-rose-200 bg-rose-50/40" : "border-neutral-200 bg-neutral-50"}`}>
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-semibold text-neutral-900">{alert.title}</p>
                         <span className={`px-2 py-0.5 rounded-full border text-[10px] ${alertStyles[alert.severity]}`}>
@@ -1347,21 +1338,21 @@ export function WatchlistPage() {
               </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4">
-                <h3 className="text-sm font-semibold text-neutral-900">Adicionar empresas</h3>
-                <div className="relative mt-3">
+              <div className="rounded-2xl border border-neutral-200 bg-neutral-100/70 p-2">
+                <h3 className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Adicionar empresas</h3>
+                <div className="relative mt-2">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                   <input
                     type="text"
                     placeholder="Buscar sugestões"
-                    className="w-full pl-10 pr-3 py-2 rounded-xl border border-neutral-200 text-sm text-neutral-700 focus:outline-none focus:ring-2 focus:ring-mint-100"
+                    className="w-full pl-10 pr-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-[11px] text-neutral-700 focus:outline-none focus:ring-2 focus:ring-mint-100"
                   />
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {suggestedCompanies.map((ticker) => (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {suggestedCompanies.slice(0, 4).map((ticker) => (
                     <button
                       key={ticker}
-                      className="px-3 py-2 rounded-xl border border-neutral-200 text-xs text-neutral-600 hover:bg-neutral-50"
+                      className="px-2 py-1 rounded-md border border-neutral-200 bg-white text-[10px] text-neutral-600 hover:bg-neutral-50"
                     >
                       {ticker}
                     </button>
@@ -1369,7 +1360,7 @@ export function WatchlistPage() {
                 </div>
                 <Link
                   to="/explorar"
-                  className="mt-3 inline-flex w-full items-center justify-center px-3 py-2 rounded-xl bg-mint-500 text-white text-xs font-medium"
+                  className="mt-2 inline-flex w-full items-center justify-center px-3 py-1.5 rounded-md border border-neutral-200 bg-white text-[11px] font-medium text-neutral-600 hover:bg-neutral-100"
                 >
                   Explorar mercado
                 </Link>
@@ -1384,7 +1375,3 @@ export function WatchlistPage() {
 }
 
 export default WatchlistPage;
-
-
-
-

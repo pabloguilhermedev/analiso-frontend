@@ -36,6 +36,7 @@ type WindowSize = '5a' | '10a';
 type PriceMetric = 'P/L' | 'EV/EBITDA' | 'P/VP';
 type FeedWindow = '30 dias' | '60 dias' | '90 dias';
 type EvidenceTab = 'Fonte' | 'Trecho' | 'Como calculamos';
+type PillarName = 'Divida' | 'Caixa' | 'Margens' | 'Retorno' | 'Proventos';
 
 type CompanyContext = {
   companyId: string;
@@ -106,7 +107,8 @@ const queueItems: CompanyQueueItem[] = [
 ];
 
 const mainTabs: MainTab[] = ['Resumo', 'Pilares', 'Mudancas', 'Eventos', 'Preco', 'Fontes'];
-const radarScores = { Divida: 58, Caixa: 72, Margens: 70, Retorno: 76, Proventos: 62 };
+const radarScores: Record<PillarName, number> = { Divida: 58, Caixa: 72, Margens: 70, Retorno: 76, Proventos: 62 };
+const radarPreviousScores: Record<PillarName, number> = { Divida: 61, Caixa: 69, Margens: 69, Retorno: 75, Proventos: 64 };
 
 const pillars: PillarData[] = [
   {
@@ -327,15 +329,63 @@ const pillars: PillarData[] = [
 ];
 
 const changes = [
-  { type: 'Resultado', date: '04/02', severity: 'Leve', impact: 'Margens', title: 'Divulgacao de resultados do 3T25 com margem estavel.', source: { docLabel: 'ITR 3T25', url: 'https://www.gov.br/cvm' } },
-  { type: 'Divida', date: '03/02', severity: 'Moderada', impact: 'Divida', title: 'Emissao de debentures para alongamento de prazo.', source: { docLabel: 'Fato Relevante', url: 'https://www.b3.com.br' } },
-  { type: 'Proventos', date: '28/01', severity: 'Leve', impact: 'Proventos', title: 'Aprovacao de juros sobre capital proprio.', source: { docLabel: 'Comunicado', url: 'https://www.weg.net/ri' } },
+  {
+    type: 'Resultado',
+    date: '04/02',
+    severity: 'Leve',
+    impact: 'Margens',
+    title: 'Divulgacao de resultados do 3T25 com margem estavel.',
+    impactLine: 'Impacto principal: Margens',
+    unchangedLine: 'Nao alterou Caixa nem Divida no curto prazo.',
+    source: { docLabel: 'ITR 3T25', url: 'https://www.gov.br/cvm' },
+  },
+  {
+    type: 'Divida',
+    date: '03/02',
+    severity: 'Moderada',
+    impact: 'Divida',
+    title: 'Emissao de debentures para alongamento de prazo.',
+    impactLine: 'Impacto principal: Divida (perfil de vencimento mais longo).',
+    unchangedLine: 'Sem mudanca material em Margens.',
+    source: { docLabel: 'Fato Relevante', url: 'https://www.b3.com.br' },
+  },
+  {
+    type: 'Proventos',
+    date: '28/01',
+    severity: 'Leve',
+    impact: 'Proventos',
+    title: 'Aprovacao de juros sobre capital proprio.',
+    impactLine: 'Impacto principal: Proventos',
+    unchangedLine: 'Nao altera o diagnostico de Retorno por ora.',
+    source: { docLabel: 'Comunicado', url: 'https://www.weg.net/ri' },
+  },
 ];
 
 const timelineEvents = [
-  { date: '13/02', title: 'WEGE3 • Resultado 4T25', source: 'RI / B3 / CVM' },
-  { date: '14/02', title: 'WEGE3 • Dividendos/JCP', source: 'RI' },
-  { date: '16/02', title: 'WEGE3 • Teleconferencia RI', source: 'RI / B3' },
+  {
+    date: '13/02',
+    title: 'WEGE3 • Resultado 4T25',
+    source: 'RI / B3 / CVM',
+    why: 'Pode alterar Caixa, Margens e Retorno.',
+    expectedImpact: 'Alto',
+    pillars: ['Caixa', 'Margens', 'Retorno'],
+  },
+  {
+    date: '14/02',
+    title: 'WEGE3 • Dividendos/JCP',
+    source: 'RI',
+    why: 'Pode mexer em Proventos e leitura de distribuicao.',
+    expectedImpact: 'Moderado',
+    pillars: ['Proventos'],
+  },
+  {
+    date: '16/02',
+    title: 'WEGE3 • Teleconferencia RI',
+    source: 'RI / B3',
+    why: 'Pode sinalizar mudancas de guidance para Margens e Divida.',
+    expectedImpact: 'Leve',
+    pillars: ['Margens', 'Divida'],
+  },
 ];
 
 const priceData = {
@@ -362,7 +412,9 @@ const sourceRows = [
 type CompanyData = {
   companyId: string;
   ticker: string;
-  radarScores: Record<'Divida' | 'Caixa' | 'Margens' | 'Retorno' | 'Proventos', number>;
+  radarScores: Record<PillarName, number>;
+  radarPreviousScores?: Record<PillarName, number>;
+  diagnosisHeadline: string;
   strongest: { title: string; score: string; badge: string; trend: string; summary: string };
   watchout: { title: string; score: string; badge: string; trend: string; summary: string };
   monitor: { pillar: string; text: string };
@@ -470,6 +522,8 @@ const mockDataByCompany: Record<string, CompanyData> = {
     companyId: 'WEGE3',
     ticker: 'WEGE3',
     radarScores,
+    radarPreviousScores,
+    diagnosisHeadline: 'WEG segue forte em caixa e retorno, mas a divida exige acompanhamento neste trimestre.',
     strongest: {
       title: 'Caixa',
       score: '72/100',
@@ -526,6 +580,8 @@ const mockDataByCompany: Record<string, CompanyData> = {
     companyId: 'VALE3',
     ticker: 'VALE3',
     radarScores: { Divida: 64, Caixa: 68, Margens: 66, Retorno: 62, Proventos: 70 },
+    radarPreviousScores: { Divida: 65, Caixa: 70, Margens: 68, Retorno: 64, Proventos: 69 },
+    diagnosisHeadline: 'Vale segue com caixa resiliente, mas retorno pede maior atencao no curto prazo.',
     strongest: {
       title: 'Proventos',
       score: '70/100',
@@ -625,6 +681,22 @@ const statusTone = {
   Saudavel: { dot: 'bg-[#0E9384]', badge: 'border-[#99F6E4] bg-[#F0FDFA] text-[#0E9384]' },
 } as const;
 
+const pillarOrder: PillarName[] = ['Divida', 'Caixa', 'Margens', 'Retorno', 'Proventos'];
+
+function pillarLabel(pillar: PillarName) {
+  return pillar === 'Divida' ? 'Divida' : pillar;
+}
+
+function statusFromScore(score: number): Status {
+  if (score < 50) return 'Risco';
+  if (score < 70) return 'Atencao';
+  return 'Saudavel';
+}
+
+function statusLabel(status: Status) {
+  return status === 'Atencao' ? 'Atencao' : status;
+}
+
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
 }
@@ -644,10 +716,10 @@ function RadarChart({
   scores,
   onSelectPillar,
 }: {
-  scores: Record<'Divida' | 'Caixa' | 'Margens' | 'Retorno' | 'Proventos', number>;
-  onSelectPillar?: (pillar: 'Divida' | 'Caixa' | 'Margens' | 'Retorno' | 'Proventos') => void;
+  scores: Record<PillarName, number>;
+  onSelectPillar?: (pillar: PillarName) => void;
 }) {
-  const labels = ['Divida', 'Caixa', 'Margens', 'Retorno', 'Proventos'] as const;
+  const labels = pillarOrder;
   const size = 190;
   const center = size / 2;
   const radius = 68;
@@ -862,11 +934,11 @@ export function CompanyAnalysis() {
     setEvidenceModal(null);
     setEvidenceTab('Fonte');
     setExpandedPillars({
-      Divida: prefs.lastOpenPillar === 'Divida',
-      Caixa: prefs.lastOpenPillar === 'Caixa',
-      Margens: prefs.lastOpenPillar === 'Margens',
-      Retorno: prefs.lastOpenPillar === 'Retorno',
-      Proventos: prefs.lastOpenPillar === 'Proventos',
+      Divida: false,
+      Caixa: false,
+      Margens: false,
+      Retorno: false,
+      Proventos: false,
     });
     setWindowByPillar({
       Divida: '5a',
@@ -919,6 +991,14 @@ export function CompanyAnalysis() {
   const scoreAverage = activeData
     ? Math.round((activeData.radarScores.Divida + activeData.radarScores.Caixa + activeData.radarScores.Margens + activeData.radarScores.Retorno + activeData.radarScores.Proventos) / 5)
     : 0;
+  const companyStatus: Status = scoreAverage < 50 ? 'Risco' : scoreAverage < 70 ? 'Atencao' : 'Saudavel';
+  const mapScores = activeData?.radarScores ?? radarScores;
+  const mapPillarEntries = pillarOrder.map((pillar) => ({ pillar, score: mapScores[pillar], status: statusFromScore(mapScores[pillar]) }));
+  const healthyPillars = mapPillarEntries.filter((entry) => entry.status === 'Saudavel');
+  const attentionPillars = mapPillarEntries.filter((entry) => entry.status === 'Atencao');
+  const riskPillars = mapPillarEntries.filter((entry) => entry.status === 'Risco');
+  const mostCriticalPillar = [...mapPillarEntries].sort((a, b) => a.score - b.score)[0];
+  const strongestPillar = [...mapPillarEntries].sort((a, b) => b.score - a.score)[0];
   const actionsDisabled = showSkeleton;
   const availablePriceMetrics = (Object.keys(activeData?.priceData.metricSeries ?? {}) as PriceMetric[]);
   const activePriceSeries =
@@ -1062,19 +1142,19 @@ export function CompanyAnalysis() {
         }
       `}</style>
       <div className="relative flex h-full">
-        <div className="w-[240px] flex-shrink-0">
+        <div className="w-[88px] flex-shrink-0 opacity-90">
           <Sidebar currentPage="explorar" />
         </div>
 
         <aside
           className={cx(
-            'relative h-full flex-shrink-0 overflow-hidden bg-white transition-all duration-200',
-            watchlistCollapsed ? 'w-0 border-r-0 p-0' : 'w-[240px] border-r border-[#EFEFEF] p-4'
+            'relative h-full flex-shrink-0 overflow-hidden bg-[#FCFDFC] transition-all duration-200',
+            watchlistCollapsed ? 'w-0 border-r-0 p-0' : 'w-[228px] border-r border-[#F3F4F6] p-3.5'
           )}
         >
           {!watchlistCollapsed && (
             <button
-              className="absolute -right-3 top-1/2 z-20 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full border border-[#D1D5DB] bg-white text-[#374151] shadow-sm hover:bg-[#F9FAFB]"
+            className="absolute -right-3 top-1/2 z-20 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full border border-[#E5E7EB] bg-white text-[#6B7280] shadow-sm hover:bg-[#F9FAFB]"
               onClick={() => setWatchlistCollapsed(true)}
               aria-label="Retrair watchlist"
               title="Retrair watchlist"
@@ -1084,7 +1164,7 @@ export function CompanyAnalysis() {
           )}
           {!watchlistCollapsed && (
           <div className="flex items-center justify-between">
-            <h2 className="text-[15px] font-semibold text-[#111827]">Watchlist</h2>
+            <h2 className="text-[14px] font-semibold text-[#374151]">Watchlist</h2>
             <div className="flex items-center gap-2">
               <Search className="h-4 w-4 text-[#9CA3AF]" />
             </div>
@@ -1116,7 +1196,7 @@ export function CompanyAnalysis() {
                   onClick={() => switchCompany(company.ticker)}
                   className={cx(
                     'group flex w-full items-center gap-2.5 text-left',
-                    selected ? 'rounded-[10px] border border-[#0E9384] bg-[#F0FDFA] p-3' : 'px-2 py-3'
+                    selected ? 'rounded-[10px] border border-[#BEEDE6] bg-[#F4FCFA] p-2.5' : 'px-2 py-2.5'
                   )}
                 >
                   <QueueLogo company={company} />
@@ -1135,7 +1215,7 @@ export function CompanyAnalysis() {
 
         {watchlistCollapsed && (
           <button
-            className="absolute left-[240px] top-1/2 z-30 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full border border-[#D1D5DB] bg-white text-[#374151] shadow-sm hover:bg-[#F9FAFB]"
+            className="absolute left-[88px] top-1/2 z-30 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full border border-[#D1D5DB] bg-white text-[#6B7280] shadow-sm hover:bg-[#F9FAFB]"
             onClick={() => setWatchlistCollapsed(false)}
             aria-label="Expandir watchlist"
             title="Expandir watchlist"
@@ -1146,56 +1226,20 @@ export function CompanyAnalysis() {
 
         <main className="h-full flex-1 overflow-y-auto bg-[#F7F8FA]">
           <header className="sticky top-0 z-10 border-b border-[#EFEFEF] bg-white px-6 py-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-4">
-                <QueueLogo company={activeCompany} />
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-[30px] font-bold leading-none text-[#0B1220]">{activeCompany.name === 'WEG' ? 'WEG' : activeCompany.name}</h1>
-                    <span className="rounded-full border border-[#D1D5DB] px-2.5 py-1 text-[13px] font-medium text-[#374151]">{activeCompany.ticker}</span>
-                    <span className={cx('rounded-full border px-2.5 py-1 text-[12px] font-semibold', statusTone[activeCompany.status].badge)}>
-                      {activeCompany.status === 'Atencao' ? 'Atenção' : activeCompany.status} • {scoreAverage}/100
-                    </span>
-                    <span className="rounded-full border border-[#D1D5DB] px-2.5 py-1 text-[12px] font-medium text-[#1F2937]">
-                      {safeMeta(activeData?.priceData.current)} <span className="text-[#0E9384]">+0,8%</span>
-                    </span>
-                  </div>
-                  <p className="truncate text-[13px] text-[#6B7280]">
-                    {activeCompany.description}
-                  </p>
+            <div className="flex min-w-0 items-center gap-4">
+              <QueueLogo company={activeCompany} />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-[30px] font-bold leading-none text-[#0B1220]">{activeCompany.name === 'WEG' ? 'WEG' : activeCompany.name}</h1>
+                  <span className="rounded-full border border-[#D1D5DB] px-2.5 py-1 text-[13px] font-medium text-[#374151]">{activeCompany.ticker}</span>
+                  <span className={cx('rounded-full border px-2.5 py-1 text-[12px] font-semibold', statusTone[companyStatus].badge)}>
+                    {statusLabel(companyStatus)} • {scoreAverage}/100
+                  </span>
+                  <span className="rounded-full border border-[#D1D5DB] px-2.5 py-1 text-[12px] font-medium text-[#1F2937]">
+                    Preço atual: {safeMeta(activeData?.priceData.current)} <span className="text-[#0E9384]">+0,8%</span>
+                  </span>
                 </div>
-              </div>
-
-              <div className="relative flex items-center gap-2">
-                <button
-                  className={cx('inline-flex items-center gap-1.5 rounded-lg border border-[#0E9384] bg-[#E9F8F5] px-3.5 py-2 text-[13px] font-semibold text-[#0E9384]', actionsDisabled ? 'cursor-not-allowed opacity-50' : '')}
-                  disabled={actionsDisabled}
-                  onClick={(event) => guardAction(event)}
-                >
-                  <Check className="h-4 w-4" />
-                  Na Watchlist
-                </button>
-                <button className={cx('rounded-lg border border-[#D1D5DB] bg-white px-3.5 py-2 text-[13px] font-medium text-[#1F2937]', actionsDisabled ? 'cursor-not-allowed opacity-50' : '')} disabled={actionsDisabled} onClick={(event) => guardAction(event)}>Criar alerta</button>
-                <button className={cx('rounded-lg border border-[#E5E7EB] bg-white px-3.5 py-2 text-[13px] text-[#4B5563]', actionsDisabled ? 'cursor-not-allowed opacity-50' : '')} disabled={actionsDisabled} onClick={(event) => guardAction(event)}>Comparar</button>
-                <button
-                  className={cx('grid h-9 w-9 place-items-center rounded-full border border-[#D1D5DB] text-[#374151]', actionsDisabled ? 'cursor-not-allowed opacity-50' : '')}
-                  disabled={actionsDisabled}
-                  onClick={() => setShowHeaderMenu((prev) => !prev)}
-                >
-                  <MoreHorizontal className="h-[18px] w-[18px]" />
-                </button>
-                {showHeaderMenu && (
-                  <div className="absolute right-0 top-11 z-30 w-40 rounded-lg border border-[#E5E7EB] bg-white p-1.5 shadow-lg">
-                    <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-[#374151] hover:bg-[#F9FAFB]" onClick={(event) => guardAction(event)}>
-                      <Bell className="h-4 w-4" />
-                      Notificações
-                    </button>
-                    <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-[#374151] hover:bg-[#F9FAFB]" onClick={(event) => guardAction(event)}>
-                      <Share2 className="h-4 w-4" />
-                      Compartilhar
-                    </button>
-                  </div>
-                )}
+                <p className="mt-1 truncate text-[13px] text-[#6B7280]">{activeCompany.description}</p>
               </div>
             </div>
 
@@ -1219,6 +1263,38 @@ export function CompanyAnalysis() {
               <span className="rounded-full border border-[#D1D5DB] px-3 py-1.5 text-[12px] font-medium text-[#374151]" title="Ver fontes na aba Fontes">
                 Fontes: CVM · B3 · RI
               </span>
+            </div>
+
+            <div className="relative mt-3 flex flex-wrap items-center gap-2 border-t border-[#E5E7EB] pt-3">
+              <button
+                className={cx('inline-flex items-center gap-1.5 rounded-lg border border-[#0E9384] bg-[#E9F8F5] px-3.5 py-2 text-[13px] font-semibold text-[#0E9384]', actionsDisabled ? 'cursor-not-allowed opacity-50' : '')}
+                disabled={actionsDisabled}
+                onClick={(event) => guardAction(event)}
+              >
+                <Check className="h-4 w-4" />
+                Na Watchlist
+              </button>
+              <button className={cx('rounded-lg border border-[#D1D5DB] bg-white px-3.5 py-2 text-[13px] font-medium text-[#1F2937]', actionsDisabled ? 'cursor-not-allowed opacity-50' : '')} disabled={actionsDisabled} onClick={(event) => guardAction(event)}>Criar alerta</button>
+              <button className={cx('rounded-lg border border-[#E5E7EB] bg-white px-3.5 py-2 text-[13px] text-[#4B5563]', actionsDisabled ? 'cursor-not-allowed opacity-50' : '')} disabled={actionsDisabled} onClick={(event) => guardAction(event)}>Comparar</button>
+              <button
+                className={cx('grid h-9 w-9 place-items-center rounded-full border border-[#D1D5DB] text-[#374151]', actionsDisabled ? 'cursor-not-allowed opacity-50' : '')}
+                disabled={actionsDisabled}
+                onClick={() => setShowHeaderMenu((prev) => !prev)}
+              >
+                <MoreHorizontal className="h-[18px] w-[18px]" />
+              </button>
+              {showHeaderMenu && (
+                <div className="absolute right-0 top-11 z-30 w-40 rounded-lg border border-[#E5E7EB] bg-white p-1.5 shadow-lg">
+                  <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-[#374151] hover:bg-[#F9FAFB]" onClick={(event) => guardAction(event)}>
+                    <Bell className="h-4 w-4" />
+                    Notificações
+                  </button>
+                  <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] text-[#374151] hover:bg-[#F9FAFB]" onClick={(event) => guardAction(event)}>
+                    <Share2 className="h-4 w-4" />
+                    Compartilhar
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="mt-3 flex items-center gap-7 border-t border-[#E5E7EB] pt-3">
@@ -1318,13 +1394,23 @@ export function CompanyAnalysis() {
               <>
                 {activeTab === 'Resumo' && (
                   <div className="space-y-4">
+                    <article className="rounded-xl border border-[#E8EAED] bg-white p-5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B7280]">Diagnostico rapido</p>
+                      <h2 className="mt-2 text-[20px] font-semibold leading-tight text-[#0B1220]">
+                        {activeData?.diagnosisHeadline ?? 'A empresa permanece estruturalmente saudavel, com um ponto de atencao concentrado em divida.'}
+                      </h2>
+                      <p className="mt-2 text-[13px] text-[#6B7280]">Entenda o que esta bem, o que exige atencao, o que mudou e o que monitorar daqui para frente.</p>
+                    </article>
+
                     <div className="grid grid-cols-12 gap-4">
                       <article className="col-span-12 rounded-xl border border-[#E8EAED] bg-white p-5 xl:col-span-5">
                         <div className="flex items-center justify-between">
                           <h2 className="text-[15px] font-semibold text-[#111827]">Placar Geral</h2>
                           <div className="flex items-center gap-2">
                             <span className="text-[16px] font-bold text-[#111827]">{scoreAverage}/100</span>
-                            <span className="rounded-full border border-[#FDE68A] bg-[#FFFBEB] px-2.5 py-1 text-[11px] font-semibold text-[#D97706]">Atenção</span>
+                            <span className={cx('rounded-full border px-2.5 py-1 text-[11px] font-semibold', statusTone[companyStatus].badge)}>
+                              {statusLabel(companyStatus)}
+                            </span>
                             <button className="text-[11px] text-[#0E9384] hover:underline" onClick={() => setShowScoreInfo(true)}>
                               Como calculamos o placar
                             </button>
@@ -1332,31 +1418,28 @@ export function CompanyAnalysis() {
                         </div>
                         <div className="mt-2">
                           <RadarChart
-                            scores={activeData?.radarScores ?? radarScores}
+                            scores={mapScores}
                             onSelectPillar={(pillar) => goToPillar(pillar)}
                           />
                         </div>
                         <div className="mt-3 flex flex-wrap justify-center gap-2">
-                          {Object.entries(activeData?.radarScores ?? radarScores).map(([name, score]) => {
-                            const status: Status = score >= 70 ? 'Saudavel' : 'Atencao';
-                            return (
-                              <button
-                                key={name}
-                                onClick={() => goToPillar(name)}
-                                className={cx('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold', statusTone[status].badge)}
-                              >
-                                {name} {score}
-                                <span className={cx('h-1.5 w-1.5 rounded-full', statusTone[status].dot)} />
-                              </button>
-                            );
-                          })}
+                          {mapPillarEntries.map(({ pillar, score, status }) => (
+                            <button
+                              key={pillar}
+                              onClick={() => goToPillar(pillar)}
+                              className={cx('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold', statusTone[status].badge)}
+                            >
+                              {pillarLabel(pillar)} {score}
+                              <span className={cx('h-1.5 w-1.5 rounded-full', statusTone[status].dot)} />
+                            </button>
+                          ))}
                         </div>
                       </article>
 
                       <article className="col-span-12 rounded-xl border border-[#E8EAED] border-l-[3px] border-l-[#0E9384] bg-white p-5 xl:col-span-3">
                         <div className="flex items-center gap-2">
                           <BarChart3 className="h-4 w-4 text-[#0E9384]" />
-                          <h3 className="text-[14px] font-semibold text-[#111827]">Principal Força</h3>
+                          <h3 className="text-[14px] font-semibold text-[#111827]">Principal Forca</h3>
                         </div>
                         <div className="mt-4">
                           <p className="text-[24px] font-bold text-[#0E9384]">{activeData?.strongest.title ?? '—'}</p>
@@ -1381,7 +1464,7 @@ export function CompanyAnalysis() {
                       <article className="col-span-12 rounded-xl border border-[#E8EAED] border-l-[3px] border-l-[#F59E0B] bg-white p-5 xl:col-span-4">
                         <div className="flex items-center gap-2">
                           <TriangleAlert className="h-4 w-4 text-[#D97706]" />
-                          <h3 className="text-[14px] font-semibold text-[#111827]">Principal Atenção</h3>
+                          <h3 className="text-[14px] font-semibold text-[#111827]">Principal Atencao</h3>
                         </div>
                         <div className="mt-4">
                           <p className="text-[24px] font-bold text-[#D97706]">{activeData?.watchout.title ?? '—'}</p>
@@ -1419,8 +1502,8 @@ export function CompanyAnalysis() {
                       </div>
                       <div className="mt-4 space-y-2 text-[14px] text-[#111827]">
                         <p className="font-medium">{activeData?.summaryScan.motherLine ?? 'Sem dados para esta empresa.'}</p>
-                        <p><span className="font-semibold">Força:</span> {activeData?.summaryScan.strength.pillar ?? '—'} — {activeData?.summaryScan.strength.text ?? '—'}</p>
-                        <p><span className="font-semibold">Atenção:</span> {activeData?.summaryScan.attention.pillar ?? '—'} — {activeData?.summaryScan.attention.text ?? '—'}</p>
+                        <p><span className="font-semibold">Forca:</span> {activeData?.summaryScan.strength.pillar ?? '—'} — {activeData?.summaryScan.strength.text ?? '—'}</p>
+                        <p><span className="font-semibold">Atencao:</span> {activeData?.summaryScan.attention.pillar ?? '—'} — {activeData?.summaryScan.attention.text ?? '—'}</p>
                         <p><span className="font-semibold">Monitorar:</span> {activeData?.summaryScan.monitor.pillar ?? '—'} — {activeData?.summaryScan.monitor.text ?? '—'}</p>
                       </div>
                       <div className="mt-4 flex items-center gap-2">
@@ -1432,6 +1515,16 @@ export function CompanyAnalysis() {
 
                 {activeTab === 'Pilares' && (
                   <div className="space-y-3">
+                    <article className="rounded-xl border border-[#E8EAED] bg-white p-4">
+                      <h2 className="text-[15px] font-semibold text-[#111827]">Sintese do diagnostico por pilares</h2>
+                      <p className="mt-1 text-[13px] text-[#6B7280]">
+                        {healthyPillars.length} pilares saudaveis, {attentionPillars.length} em atencao e {riskPillars.length} em risco.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[12px] text-[#374151]">
+                        <span className="rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-2.5 py-1">Principal risco: {mostCriticalPillar ? pillarLabel(mostCriticalPillar.pillar) : '—'}</span>
+                        <span className="rounded-full border border-[#E5E7EB] bg-[#F9FAFB] px-2.5 py-1">Principal sustentacao: {strongestPillar ? pillarLabel(strongestPillar.pillar) : '—'}</span>
+                      </div>
+                    </article>
                     {(activeData?.pillars ?? []).filter((p) => p.companyId === companyContext.companyId).length === 0 && (
                       <article className="rounded-xl border border-[#E8EAED] bg-white p-5">
                         <p className="text-[14px] text-[#6B7280]">Ainda não temos dados suficientes para este indicador.</p>
@@ -1590,7 +1683,7 @@ export function CompanyAnalysis() {
                   <div>
                     <div className="mb-3">
                       <h2 className="text-[15px] font-semibold text-[#111827]">O que mudou (90 dias)</h2>
-                      <p className="text-[12px] text-[#9CA3AF]">Feed de eventos passados que alteraram o diagnóstico.</p>
+                      <p className="text-[12px] text-[#9CA3AF]">Evento → impacto → pilar afetado. Cada item explica por que isso importa.</p>
                     </div>
                     <div className="mb-4 flex items-center gap-2">
                       {(['30 dias', '60 dias', '90 dias'] as FeedWindow[]).map((period) => (
@@ -1619,11 +1712,17 @@ export function CompanyAnalysis() {
                               <span className="text-[12px] text-[#9CA3AF]">{change.date}</span>
                               <span className="rounded-full border border-[#FDE68A] bg-[#FFFBEB] px-2 py-0.5 text-[11px] text-[#D97706]">{change.severity}</span>
                             </div>
-                            <span className="text-[12px] text-[#6B7280]">Impacta: {change.impact}</span>
+                            <span className="text-[12px] text-[#6B7280]">Pilar afetado: {change.impact}</span>
                           </div>
                           <h3 className="mt-2 text-[14px] font-semibold text-[#111827]">{change.title}</h3>
                           {change.beforeAfter && <p className="mt-1 text-[12px] text-[#6B7280]">Antes → Depois: {change.beforeAfter}</p>}
-                          <p className="mt-1 text-[11px] text-[#9CA3AF]">Fonte: {safeMeta(change.source.docLabel)} • Atualizado em: {safeMeta(change.date)}</p>
+                          <p className="mt-2 text-[13px] font-medium text-[#374151]">{change.impactLine ?? `Impacto principal: ${change.impact}`}</p>
+                          {change.unchangedLine && <p className="mt-1 text-[12px] text-[#6B7280]">{change.unchangedLine}</p>}
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[#6B7280]">
+                            <span className="rounded-full border border-[#E5E7EB] bg-white px-2 py-1">Fonte: {safeMeta(change.source.docLabel)}</span>
+                            <span className="rounded-full border border-[#E5E7EB] bg-white px-2 py-1">Atualizado: {safeMeta(change.date)}</span>
+                            <span className="rounded-full border border-[#99F6E4] bg-[#F0FDFA] px-2 py-1 text-[#0E9384]">Status: Atualizado</span>
+                          </div>
                           <a
                             href={change.source.url}
                             target="_blank"
@@ -1647,7 +1746,7 @@ export function CompanyAnalysis() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-[15px] font-semibold text-[#111827]">Agenda (próximos eventos)</h2>
-                        <p className="text-[12px] text-[#9CA3AF]">Agenda futura para acompanhar resultados e gatilhos.</p>
+                        <p className="text-[12px] text-[#9CA3AF]">Mapa de gatilhos futuros: por que cada evento importa e quais pilares pode mexer.</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {(['30 dias', '60 dias', '90 dias'] as FeedWindow[]).map((period) => (
@@ -1677,9 +1776,19 @@ export function CompanyAnalysis() {
                             <article className="flex items-center justify-between rounded-lg border border-[#E8EAED] bg-white p-3.5">
                               <div>
                                 <p className="text-[13px] font-semibold text-[#111827]">Próximo evento: {timelineEvent.title}</p>
-                                <p className="text-[11px] text-[#9CA3AF]">Fonte: {safeMeta(timelineEvent.source)}</p>
+                                <p className="mt-1 text-[12px] text-[#374151]">{timelineEvent.why ?? 'Pode alterar leitura dos pilares.'}</p>
+                                <p className="mt-1 text-[12px] text-[#6B7280]">Pode mexer em: {(timelineEvent.pillars ?? []).join(', ') || '—'}</p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                                  <span className="rounded-full border border-[#E5E7EB] bg-white px-2 py-1 text-[#6B7280]">Fonte: {safeMeta(timelineEvent.source)}</span>
+                                  <span className={cx('rounded-full border px-2 py-1', timelineEvent.expectedImpact === 'Alto' ? 'border-[#FCA5A5] bg-[#FFF1F2] text-[#DC2626]' : timelineEvent.expectedImpact === 'Moderado' ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#D97706]' : 'border-[#99F6E4] bg-[#F0FDFA] text-[#0E9384]')}>
+                                    Impacto esperado: {timelineEvent.expectedImpact ?? 'Leve'}
+                                  </span>
+                                </div>
                               </div>
-                              <button className={cx('rounded-md border border-[#E5E7EB] px-3 py-1.5 text-[12px] text-[#6B7280]', actionsDisabled ? 'cursor-not-allowed opacity-50' : '')} disabled={actionsDisabled} onClick={(event) => guardAction(event, timelineEvent.companyId)}>Adicionar lembrete</button>
+                              <div className="flex items-center gap-2">
+                                <button className={cx('rounded-md border border-[#E5E7EB] px-3 py-1.5 text-[12px] text-[#6B7280]', actionsDisabled ? 'cursor-not-allowed opacity-50' : '')} disabled={actionsDisabled} onClick={(event) => guardAction(event, timelineEvent.companyId)}>Entender impacto</button>
+                                <button className={cx('rounded-md border border-[#E5E7EB] px-3 py-1.5 text-[12px] text-[#6B7280]', actionsDisabled ? 'cursor-not-allowed opacity-50' : '')} disabled={actionsDisabled} onClick={(event) => guardAction(event, timelineEvent.companyId)}>Adicionar lembrete</button>
+                              </div>
                             </article>
                           </div>
                         </div>
@@ -1712,8 +1821,14 @@ export function CompanyAnalysis() {
                         })}
                       </div>
                     </div>
+                    <p className="mt-2 text-[14px] font-medium text-[#111827]">
+                      Leitura atual: {activePriceRow?.insight ?? 'Sem dados para este indicador.'}
+                    </p>
                     <p className="mt-1 text-[13px] text-[#6B7280]">
                       Hoje está {activePriceRow?.insight?.toLowerCase() ?? 'sem dados para este indicador'} em {selectedPriceMetric}.
+                    </p>
+                    <p className="mt-1 text-[12px] text-[#6B7280]">
+                      Acima da mediana historica nao significa automaticamente caro. O multiplo tambem reflete crescimento, qualidade do negocio e juros.
                     </p>
                     <p className="mt-1 text-[11px] text-[#9CA3AF]">Fonte: {safeMeta(activeData?.priceData.source)} • Atualizado em: {safeMeta(activeData?.priceData.updatedAt)}</p>
                     <p className="mt-4 text-[28px] font-bold text-[#111827]">Preço atual: {activeData?.priceData.current}</p>

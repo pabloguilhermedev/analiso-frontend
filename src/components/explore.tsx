@@ -21,10 +21,10 @@ import {
   UserCircle2,
   X,
 } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { GlossaryText } from "./glossary/glossary-text";
 
-import { AppSidebar } from "./dashboard";
+import { Sidebar } from "./dashboard/sidebar";
 import { MiniSparkline } from "./mini-sparkline";
 import logoCogna from "../assets/logos/cogna.png";
 import logoCosan from "../assets/logos/cosan.png";
@@ -526,7 +526,6 @@ function Drawer({
 
 export function ExplorePage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [selectedTab, setSelectedTab] = useState<MoverRow["type"]>("altas");
   const [selectedEntryPoints, setSelectedEntryPoints] = useState<string[]>([]);
   const [compareTickers, setCompareTickers] = useState<string[]>([]);
@@ -649,12 +648,12 @@ export function ExplorePage() {
 
   return (
     <div className="min-h-screen bg-[#F7F8FA]">
-      <div className="fixed inset-y-0 left-0 z-30 w-[240px]">
-        <AppSidebar currentPath={location.pathname} onNavigate={navigate} />
+      <div className="fixed inset-y-0 left-0 z-30 w-[88px]">
+        <Sidebar currentPage="explorar" />
       </div>
 
       {/* Header */}
-      <header className="fixed top-0 left-[240px] right-0 z-10 h-12 border-b border-[#E5E7EB] bg-white">
+      <header className="fixed top-0 left-[88px] right-0 z-10 h-12 border-b border-[#E5E7EB] bg-white">
         <div className="flex h-full items-center justify-between gap-2 px-3 sm:px-5">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="hidden h-9 w-full max-w-[480px] items-center rounded-lg border border-[#E5E7EB] bg-white px-3 sm:flex">
@@ -688,7 +687,7 @@ export function ExplorePage() {
         </div>
       </header>
 
-      <main className="ml-[240px] pt-12">
+      <main className="ml-[88px] pt-12">
         <div className="flex items-start">
           <div className="flex-1 p-8 pr-0">
             <div className="max-w-[1200px] space-y-8">

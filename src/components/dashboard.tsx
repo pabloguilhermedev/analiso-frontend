@@ -27,6 +27,7 @@ import { Input } from "./ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { cn } from "./ui/utils";
+import { Sidebar } from "./dashboard/sidebar";
 
 import logoItau from "../assets/logos/itau.png";
 import logoMrv from "../assets/logos/mrv.jpg";
@@ -104,46 +105,6 @@ const statusClasses: Record<Status, string> = {
   Atenção: "border-amber-300 bg-amber-100 text-amber-900",
   Risco: "border-rose-300 bg-rose-100 text-rose-900",
 };
-
-type NavItem = {
-  icon: typeof Activity;
-  label: string;
-  path?: string;
-};
-
-type NavSection = {
-  label: string;
-  items: NavItem[];
-};
-
-const navSections: NavSection[] = [
-  {
-    label: "PRINCIPAL",
-    items: [
-      { icon: LayoutGrid, label: "Dashboard", path: "/dashboard" },
-      { icon: Bookmark, label: "Watchlist", path: "/watchlist" },
-      { icon: Compass, label: "Explorar", path: "/explorar" },
-    ],
-  },
-  {
-    label: "ANÁLISE",
-    items: [
-      { icon: Activity, label: "Indicadores" },
-      { icon: Activity, label: "Atividade" },
-    ],
-  },
-  {
-    label: "RELATÓRIOS",
-    items: [
-      { icon: FileText, label: "Relatórios" },
-      { icon: Database, label: "Fontes" },
-    ],
-  },
-  {
-    label: "APPS",
-    items: [{ icon: Settings, label: "Configurações" }],
-  },
-];
 
 const inboxSeed: InboxSeedItem[] = [
   {
@@ -354,6 +315,10 @@ function relativeFromTimestamp(timestamp: number) {
   return `há ${days} d`;
 }
 
+function pluralize(value: number, singular: string, plural: string) {
+  return `${value} ${value === 1 ? singular : plural}`;
+}
+
 function toPillarQueryKey(pillar?: Pillar) {
   if (!pillar) return "";
   if (pillar === "Dívida") return "divida";
@@ -386,91 +351,9 @@ function SegmentedHealthBar({ healthy, attention, risk }: { healthy: number; att
   );
 }
 
-export function AppSidebar({
-  collapsed = false,
-  mobile = false,
-  isDarkMode = false,
-  currentPath,
-  onNavigate,
-}: {
-  collapsed?: boolean;
-  mobile?: boolean;
-  isDarkMode?: boolean;
-  currentPath?: string;
-  onNavigate?: (path: string) => void;
-}) {
-  return (
-    <aside
-      className={cn(
-        "flex h-full flex-col border-r",
-        isDarkMode ? "border-[#1F2937] bg-[#0F172A]" : "border-[#EAECF0] bg-white",
-        mobile ? "w-[240px]" : collapsed ? "w-16" : "w-[240px]",
-      )}
-    >
-      <div className={cn("border-b px-3 pb-3 pt-4", isDarkMode ? "border-[#1F2937]" : "border-[#EAECF0]")}>
-        <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-md bg-[#0E9384]" />
-          {!collapsed && <span className={cn("text-[15px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>Analiso</span>}
-          {!collapsed && <ChevronDown className={cn("ml-auto h-4 w-4", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")} />}
-        </div>
-      </div>
-
-      <div className="flex-1 space-y-2 overflow-y-auto px-2 py-3">
-        {navSections.map((section) => (
-          <div key={section.label}>
-            {!collapsed && <p className={cn("px-2 py-2 text-[11px] font-medium tracking-[0.06em]", isDarkMode ? "text-[#9CA3AF]" : "text-[#98A2B3]")}>{section.label}</p>}
-            <div className="space-y-1">
-              {section.items.map((item) => {
-                const active = Boolean(item.path && currentPath === item.path);
-                return (
-                  <button
-                    key={item.label}
-                    onClick={() => item.path && onNavigate?.(item.path)}
-                    className={cn(
-                      "flex h-9 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 text-left text-[14px] font-medium transition-colors",
-                      active
-                        ? isDarkMode
-                          ? "bg-[#1E293B] text-[#F3F4F6]"
-                          : "bg-[#F2F4F7] text-[#101828]"
-                        : isDarkMode
-                          ? "text-[#9CA3AF] hover:bg-[#111827] hover:text-[#F3F4F6]"
-                          : "text-[#667085] hover:bg-[#F8FAFC] hover:text-[#101828]",
-                      collapsed && "justify-center px-0",
-                    )}
-                  >
-                    <item.icon className={cn("h-4 w-4", active ? (isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]") : isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")} />
-                    {!collapsed && <span className={active ? "font-semibold" : ""}>{item.label}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className={cn("mt-auto border-t p-3", isDarkMode ? "border-[#1F2937]" : "border-[#EAECF0]")}>
-        <div className="flex items-center gap-2">
-          <Avatar className="h-7 w-7">
-            <AvatarFallback className="text-[11px]">JS</AvatarFallback>
-          </Avatar>
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className={cn("truncate text-[13px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>João Silva</p>
-              <p className={cn("truncate text-[11px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>joao@analiso.com.br</p>
-            </div>
-          )}
-          {!collapsed && <Ellipsis className={cn("ml-auto h-4 w-4", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")} />}
-        </div>
-      </div>
-    </aside>
-  );
-}
-
 export function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [inboxError, setInboxError] = useState(false);
   const [inboxFilters, setInboxFilters] = useState<InboxFilters>(() => loadInboxFilters());
   const [inboxMode, setInboxMode] = useState<InboxMode>(() => loadInboxMode());
@@ -688,103 +571,103 @@ export function Dashboard() {
   };
 
   const focusedPillar = inboxFilters.pillars.length === 1 ? inboxFilters.pillars[0] : pillarMovements[0].pillar;
+  const todayItems = useMemo(() => inboxItems.filter((item) => item.ageMinutes <= 24 * 60), [inboxItems]);
+  const priorityItem = inboxRows[0];
+  const leadingPillarMovement = [...pillarMovements].sort((a, b) => b.events - a.events)[0];
+  const visiblePillarMovements = [...pillarMovements].sort((a, b) => b.events - a.events).slice(0, 4);
 
-  const kpiCards = [
+  const todayRiskCount = todayItems.filter((item) => item.severity === "Risco").length;
+  const todayAttentionCount = todayItems.filter((item) => item.severity === "Atenção").length;
+  const todayHealthyCount = todayItems.filter((item) => item.severity === "Saudável").length;
+
+  const topRiskItem = todayItems.filter((item) => item.severity === "Risco").sort((a, b) => b.impactScore - a.impactScore)[0];
+  const topImproveItem = todayItems.filter((item) => item.severity === "Saudável").sort((a, b) => b.impactScore - a.impactScore)[0];
+  const healthyWatchlistCount = 12;
+  const totalWatchlistCount = 20;
+
+  const pillarInsight: Record<Pillar, string> = {
+    Dívida: "concentrou mais sinais de pressão hoje",
+    Margens: "teve volume alto de mudanças com viés de atenção",
+    Caixa: "perdeu força em parte da watchlist",
+    Proventos: "seguiu mais estável, com poucos sinais de risco",
+    Retorno: "ficou mais estável e com baixa dispersão",
+  };
+
+  const feedCtaLabel = (item: InboxItem, isPriority: boolean) => {
+    if (isPriority || item.severity === "Risco") return "Ver análise completa";
+    return "Entender impacto";
+  };
+
+  const supportCards = [
+    {
+      title: "Maior risco hoje",
+      value: topRiskItem ? topRiskItem.ticker : "Sem risco novo",
+      subtitle: topRiskItem
+        ? `${topRiskItem.title}`
+        : "Nenhum sinal crítico novo nas últimas 24h",
+      delta: topRiskItem
+        ? `${pluralize(todayRiskCount, "sinal crítico", "sinais críticos")} nas últimas 24h`
+        : "Watchlist sem piora crítica nova hoje",
+      ctaLabel: "Ver análise completa",
+      action: () => (topRiskItem ? openInboxItem(topRiskItem) : focusInboxRecentImpact()),
+      accent: "border-rose-200 bg-rose-50 text-rose-800",
+    },
+    {
+      title: "Maior melhora",
+      value: topImproveItem ? topImproveItem.ticker : "Sem melhora nova",
+      subtitle: topImproveItem
+        ? `${topImproveItem.title}`
+        : "Sem recuperação relevante registrada hoje",
+      delta: `${pluralize(todayHealthyCount, "sinal positivo", "sinais positivos")} relevantes hoje`,
+      ctaLabel: "Entender impacto",
+      action: () => (topImproveItem ? openInboxItem(topImproveItem) : focusInboxRecentImpact()),
+      accent: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    },
+    {
+      title: "Pilar mais movimentado",
+      value: leadingPillarMovement.pillar,
+      subtitle: `${leadingPillarMovement.pillar} concentrou a maior parte das mudanças do dia`,
+      delta: `${leadingPillarMovement.events} eventos · maioria em atenção`,
+      ctaLabel: "Filtrar por pilar",
+      action: () => applySinglePillarFilter(leadingPillarMovement.pillar),
+      accent: "border-amber-200 bg-amber-50 text-amber-800",
+    },
     {
       title: "Saúde da watchlist",
-      value: "59%",
-      subtitle: "empresas saudáveis",
-      delta: "+2,1 p.p vs semana passada",
-      deltaPositive: true,
-      ctaLabel: "Ver detalhes",
+      value: `${healthyWatchlistCount} de ${totalWatchlistCount}`,
+      subtitle: "empresas seguem sem sinais relevantes hoje",
+      delta: "+2,1 p.p. vs semana passada",
+      ctaLabel: "Ver composição",
       action: () => navigate("/watchlist?filtro=saude"),
-    },
-    {
-      title: "Empresas monitoradas",
-      value: "20",
-      subtitle: "na watchlist",
-      delta: "+2 este mês",
-      deltaPositive: true,
-      ctaLabel: "Ver lista",
-      action: () => navigate("/watchlist"),
-    },
-    {
-      title: "Mudanças hoje",
-      value: "14",
-      subtitle: "eventos relevantes",
-      delta: "-0,8 vs ontem",
-      deltaPositive: false,
-      ctaLabel: "Abrir inbox",
-      action: focusInboxRecentImpact,
-    },
-    {
-      title: "Alertas ativos",
-      value: "9",
-      subtitle: "monitoramentos em aberto",
-      delta: "+20,1% este mês",
-      deltaPositive: true,
-      ctaLabel: "Ver alertas",
-      action: () => navigate("/watchlist?tab=alertas"),
+      accent: "border-[#D0D5DD] bg-[#F8FAFC] text-[#344054]",
     },
   ];
 
-  const severityCount = useMemo(() => {
-    return inboxRows.reduce(
-      (acc, item) => {
-        if (item.severity === "Risco") acc.risk += 1;
-        if (item.severity === "Atenção") acc.attention += 1;
-        if (item.severity === "Saudável") acc.healthy += 1;
-        return acc;
-      },
-      { risk: 0, attention: 0, healthy: 0 },
-    );
-  }, [inboxRows]);
-
-  const summaryParts = [
-    `Período: ${inboxFilters.period}`,
-    `Ordenação: ${inboxFilters.sortBy}`,
-    hasSeverityFilter ? `Severidade: ${activeSeverities.join(", ")}` : null,
-    hasPillarFilter ? `Pilar: ${activePillars.join(", ")}` : null,
-    hasSourceFilter ? `Fonte: ${activeSources.join(", ")}` : null,
-  ].filter(Boolean) as string[];
+  const activeFilterChips = [
+    hasSeverityFilter ? activeSeverities : [],
+    hasPillarFilter ? activePillars : [],
+    hasSourceFilter ? activeSources : [],
+    hasPeriodFilter ? [`${inboxFilters.period}`] : [],
+  ].flat();
 
   const refreshLabel = useMemo(() => relativeFromTimestamp(lastRefreshAt), [lastRefreshAt, clockTick]);
+  const orderLabel = inboxMode === "tempo-real" ? "tempo real" : "impacto";
 
   return (
     <div className={cn("min-h-screen", isDarkMode ? "bg-[#020617] text-[#E5E7EB]" : "bg-[#F8FAFC] text-[#101828]")}>
-      <div className={cn("hidden md:fixed md:inset-y-0 md:left-0 md:z-30 md:block", sidebarCollapsed ? "md:w-16" : "md:w-[240px]")}>
-        <AppSidebar isDarkMode={isDarkMode} collapsed={sidebarCollapsed} currentPath={location.pathname} onNavigate={navigate} />
+      <div className="hidden md:fixed md:inset-y-0 md:left-0 md:z-30 md:block md:w-[88px]">
+        <Sidebar currentPage="dashboard" />
       </div>
 
-      <div className={cn(sidebarCollapsed ? "md:pl-16" : "md:pl-[240px]")}>
+      <div className="md:pl-[88px]">
         <header className={cn("sticky top-0 z-20 h-12 border-b", isDarkMode ? "border-[#1F2937] bg-[#0B1220]" : "border-[#EAECF0] bg-white")}>
           <div className="flex h-full items-center justify-between px-6">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="md:hidden">
-                    <Menu className="h-5 w-5 text-[#667085]" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="p-0">
-                  <AppSidebar isDarkMode={isDarkMode} mobile currentPath={location.pathname} onNavigate={navigate} />
-                </SheetContent>
-              </Sheet>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn("hidden h-8 w-8 shrink-0 rounded-md md:inline-flex", isDarkMode ? "text-[#9CA3AF] hover:bg-[#1F2937]" : "text-[#667085] hover:bg-[#F2F4F7]")}
-                onClick={() => setSidebarCollapsed((prev) => !prev)}
-                aria-label={sidebarCollapsed ? "Expandir sidebar" : "Minimizar sidebar"}
-                title={sidebarCollapsed ? "Expandir sidebar" : "Minimizar sidebar"}
-              >
-                <PanelLeft className="h-[18px] w-[18px]" />
-              </Button>
-              <div className={cn("hidden h-9 w-full max-w-[520px] items-center rounded-lg border-2 px-3 md:flex", isDarkMode ? "border-[#4B5563] bg-[#111827]" : "border-[#D0D5DD] bg-white")}>
+              <div className="md:hidden" />
+              <div className={cn("hidden h-8 w-full max-w-[430px] items-center rounded-lg border px-3 md:flex", isDarkMode ? "border-[#334155] bg-[#0F172A]" : "border-[#E4E7EC] bg-[#FCFCFD]")}>
                 <Search className={cn("h-4 w-4", isDarkMode ? "text-[#9CA3AF]" : "text-[#98A2B3]")} />
                 <Input
-                  className={cn("h-8 border-0 bg-transparent px-2 text-[14px] shadow-none ring-0 focus-visible:ring-0", isDarkMode ? "text-[#E5E7EB] placeholder:text-[#9CA3AF]" : "")}
+                  className={cn("h-7 border-0 bg-transparent px-2 text-[13px] shadow-none ring-0 focus-visible:ring-0", isDarkMode ? "text-[#E5E7EB] placeholder:text-[#9CA3AF]" : "")}
                   placeholder="Busque empresa ou ticker..."
                 />
               </div>
@@ -816,53 +699,88 @@ export function Dashboard() {
         </header>
 
         <main className="space-y-6 px-6 pb-10 pt-6">
-          <section className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <h1 className={cn("text-[24px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>Dashboard</h1>
-              <span className={cn("rounded-full border px-2.5 py-1 text-[12px]", isDarkMode ? "border-[#374151] bg-[#111827] text-[#9CA3AF]" : "border-[#EAECF0] bg-white text-[#667085]")}>Atualizado em 05/02</span>
+          <section className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <h1 className={cn("text-[24px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>Sua watchlist hoje</h1>
+                <span className={cn("rounded-full border px-2.5 py-1 text-[12px]", isDarkMode ? "border-[#374151] bg-[#111827] text-[#9CA3AF]" : "border-[#EAECF0] bg-white text-[#667085]")}>Atualizado {refreshLabel}</span>
+              </div>
+              <p className={cn("text-[13px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>Leitura das últimas 24h</p>
             </div>
-            <Button className="h-8 rounded-lg bg-[#0E9384] px-3 text-[12px] font-semibold text-white hover:bg-[#0B7F74]">+ Criar alerta</Button>
+            <Button
+              variant="outline"
+              className={cn(
+                "h-8 rounded-lg border px-3 text-[12px] font-medium",
+                isDarkMode ? "border-[#334155] bg-[#0F172A] text-[#9CA3AF] hover:bg-[#1F2937]" : "border-[#D0D5DD] bg-[#FCFCFD] text-[#475467] hover:bg-white",
+              )}
+            >
+              + Criar alerta
+            </Button>
+          </section>
+
+          <section>
+            <Card className={cn("rounded-2xl border", isDarkMode ? "border-[#134E48] bg-[#0B2A2A]" : "border-[#BFEAE4] bg-gradient-to-r from-[#ECFDF9] to-white")}>
+              <CardContent className="space-y-3 p-4">
+                <div className="space-y-1.5">
+                  <p className={cn("text-[12px] font-semibold uppercase tracking-[0.08em]", isDarkMode ? "text-[#5EEAD4]" : "text-[#0E9384]")}>Resumo do dia</p>
+                  <p className={cn("text-[20px] font-semibold leading-tight", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>
+                    {todayRiskCount > 0 || todayAttentionCount > 0
+                      ? `Hoje sua watchlist teve ${pluralize(todayRiskCount, "mudança de risco", "mudanças de risco")} e ${pluralize(todayHealthyCount, "melhora importante", "melhoras importantes")}.`
+                      : "Sua watchlist está estável hoje, sem pioras críticas novas."}
+                  </p>
+                  <p className={cn("text-[14px]", isDarkMode ? "text-[#C5D4D4]" : "text-[#475467]")}>
+                    {priorityItem
+                      ? `Comece por ${priorityItem.ticker}: ${priorityItem.title.toLowerCase()}. Pilar mais pressionado: ${leadingPillarMovement.pillar}.`
+                      : "Comece pelas atualizações mais recentes para confirmar se houve mudanças de contexto."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button onClick={focusInboxRecentImpact} className="h-9 rounded-lg bg-[#0E9384] px-3 text-[12px] font-semibold text-white hover:bg-[#0B7F74]">
+                    Ver prioridades do dia
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={focusInboxRecentImpact}
+                    className={cn(
+                      "h-9 rounded-lg border px-3 text-[12px] font-semibold",
+                      isDarkMode ? "border-[#2DD4BF]/40 bg-transparent text-[#CCFBF1] hover:bg-[#0F3A39]" : "border-[#99DFD7] bg-white text-[#0E9384] hover:bg-[#F0FDFA]",
+                    )}
+                  >
+                    Ver atualizações
+                  </Button>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px]",
+                      isDarkMode ? "border-[#334155] bg-[#0F172A] text-[#9CA3AF]" : "border-[#D0D5DD] bg-white text-[#667085]",
+                    )}
+                  >
+                    <Database className="h-3 w-3" />
+                    Dados oficiais · CVM / B3 / RI
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
           </section>
 
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {kpiCards.map((card, idx) => (
+            {supportCards.map((card) => (
               <button
                 key={card.title}
                 onClick={card.action}
                 className={cn(
-                  "group rounded-2xl border p-4 text-left transition-all duration-150",
+                  "group rounded-2xl border p-3.5 text-left transition-all duration-150",
                   isDarkMode
                     ? "border-[#1F2937] bg-[#0F172A] hover:border-[#334155] hover:shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
                     : "border-[#EAECF0] bg-white hover:border-[#D0D5DD] hover:shadow-[0_2px_10px_rgba(16,24,40,0.06)]",
                 )}
               >
-                <div className={cn("mb-2 border-b pb-2 text-[12px] font-medium", isDarkMode ? "border-[#1F2937] text-[#9CA3AF]" : "border-[#F2F4F7] text-[#667085]")}>{card.title}</div>
-
-                {idx === 0 ? (
-                  <div className="mb-3 flex items-center gap-3">
-                    <div
-                      className="h-10 w-10 rounded-full"
-                      style={{
-                        background: "conic-gradient(#22C55E 0 59%, #F59E0B 59% 87%, #EF4444 87% 100%)",
-                      }}
-                    >
-                      <div className="m-[4px] h-8 w-8 rounded-full bg-white" />
-                    </div>
-                    <div>
-                      <p className={cn("text-[28px] leading-none font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>{card.value}</p>
-                      <p className={cn("mt-1 text-[12px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>{card.subtitle}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mb-3">
-                    <p className={cn("text-[28px] leading-none font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>{card.value}</p>
-                    <p className={cn("mt-1 text-[12px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>{card.subtitle}</p>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between">
-                  <p className={cn("text-[12px] font-medium", card.deltaPositive ? "text-emerald-600" : "text-rose-600")}>{card.delta}</p>
+                <p className={cn("mb-2 text-[12px] font-medium", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>{card.title}</p>
+                <p className={cn("text-[17px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>{card.value}</p>
+                <p className={cn("mt-1.5 text-[12px] leading-snug", isDarkMode ? "text-[#CBD5E1]" : "text-[#344054]")}>{card.subtitle}</p>
+                <p className={cn("mt-2.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium", card.accent)}>{card.delta}</p>
+                <div className="mt-2.5 flex items-center justify-between">
                   <span className="text-[12px] font-semibold text-[#0E9384]">{card.ctaLabel}</span>
+                  <ChevronRight className={cn("h-4 w-4", isDarkMode ? "text-[#94A3B8]" : "text-[#98A2B3]")} />
                 </div>
               </button>
             ))}
@@ -874,15 +792,17 @@ export function Dashboard() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <CardTitle className={cn("text-[16px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>Atualizações da watchlist</CardTitle>
-                    <CardDescription className={cn("text-[14px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>Tudo que mudou na sua watchlist, com prioridade e motivo.</CardDescription>
+                    <CardDescription className={cn("text-[14px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>
+                      Comece pelas mudanças com maior impacto e entenda por que elas importam.
+                    </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="inline-flex rounded-lg border border-[#D0D5DD] bg-white p-0.5">
+                    <div className={cn("inline-flex rounded-lg border p-0.5", isDarkMode ? "border-[#374151] bg-[#0F172A]" : "border-[#D0D5DD] bg-white")}>
                       <button
                         onClick={setImpactMode}
                         className={cn(
                           "rounded-md px-2.5 py-1.5 text-[12px] font-semibold transition",
-                          inboxMode === "top-impacto" ? "bg-[#0E9384] text-white" : "text-[#667085] hover:bg-[#F2F4F7]",
+                          inboxMode === "top-impacto" ? "bg-[#0E9384] text-white" : isDarkMode ? "text-[#9CA3AF] hover:bg-[#1F2937]" : "text-[#667085] hover:bg-[#F2F4F7]",
                         )}
                       >
                         Top impacto
@@ -891,7 +811,7 @@ export function Dashboard() {
                         onClick={setRealTimeMode}
                         className={cn(
                           "rounded-md px-2.5 py-1.5 text-[12px] font-semibold transition",
-                          inboxMode === "tempo-real" ? "bg-[#0E9384] text-white" : "text-[#667085] hover:bg-[#F2F4F7]",
+                          inboxMode === "tempo-real" ? "bg-[#0E9384] text-white" : isDarkMode ? "text-[#9CA3AF] hover:bg-[#1F2937]" : "text-[#667085] hover:bg-[#F2F4F7]",
                         )}
                       >
                         Tempo real
@@ -901,8 +821,8 @@ export function Dashboard() {
                 </div>
 
                 <div className={cn("rounded-xl border p-3", isDarkMode ? "border-[#1F2937] bg-[#111827]" : "border-[#EAECF0] bg-[#FCFCFD]")}>
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <p className="text-[12px] font-medium text-[#667085]">Período</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className={cn("text-[12px] font-medium", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>Período</p>
                     {(["24h", "7d", "30d"] as WindowRange[]).map((range) => (
                       <button
                         key={range}
@@ -919,24 +839,22 @@ export function Dashboard() {
                         {range}
                       </button>
                     ))}
-                    {inboxMode === "tempo-real" && (
-                      <div className="ml-auto flex items-center gap-2">
-                        <span className="text-[12px] font-medium text-[#667085]">Ordenado por:</span>
-                        <span className={cn("h-7 rounded-full border px-3 text-[11px] leading-7", isDarkMode ? "border-[#374151] bg-[#0F172A] text-[#D1D5DB]" : "border-[#D0D5DD] bg-white text-[#344054]")}>
-                          Mais recente
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2">
                     <button
                       onClick={() => setFiltersOpen((prev) => !prev)}
-                      className={cn("rounded-lg border px-3 py-1.5 text-[12px] font-medium", isDarkMode ? "border-[#374151] bg-[#0F172A] text-[#D1D5DB] hover:bg-[#1F2937]" : "border-[#D0D5DD] bg-white text-[#475467] hover:bg-[#F9FAFB]")}
+                      className={cn(
+                        "ml-auto rounded-lg border px-3 py-1.5 text-[12px] font-medium",
+                        isDarkMode ? "border-[#374151] bg-[#0F172A] text-[#D1D5DB] hover:bg-[#1F2937]" : "border-[#D0D5DD] bg-white text-[#475467] hover:bg-[#F9FAFB]",
+                      )}
                     >
                       {showFiltersCount ? `Filtros (${advancedFiltersCount})` : "Filtros"}
                     </button>
-                    <div className="flex items-center gap-2 text-[12px] text-[#667085]">
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between gap-2 text-[12px]">
+                    <p className={cn(isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>
+                      {inboxRows.length} atualizações · ordenado por {orderLabel}
+                    </p>
+                    <div className={cn("flex items-center gap-2", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>
                       <span>Atualizado {refreshLabel}</span>
                       <button onClick={refreshInboxNow} className="font-semibold text-[#0E9384] hover:text-[#0B7F74]" disabled={isRefreshing}>
                         {isRefreshing ? "Atualizando..." : "Atualizar agora"}
@@ -957,7 +875,7 @@ export function Dashboard() {
                             className={cn(
                               "h-7 rounded-full border px-3 text-[11px] font-medium",
                               activeSeverities.includes(status)
-                                ? "border-[#0E9384] bg-[#ECFDF3] text-[#0E9384]"
+                                ? "border-[#0E9384] bg-[#E6FFFB] text-[#0E9384]"
                                 : "border-[#EAECF0] bg-white text-[#667085] hover:bg-[#F9FAFB]",
                             )}
                           >
@@ -975,7 +893,7 @@ export function Dashboard() {
                             className={cn(
                               "h-7 rounded-full border px-3 text-[11px] font-medium",
                               activePillars.includes(pillar)
-                                ? "border-[#0E9384] bg-[#ECFDF3] text-[#0E9384]"
+                                ? "border-[#0E9384] bg-[#E6FFFB] text-[#0E9384]"
                                 : "border-[#EAECF0] bg-white text-[#667085] hover:bg-[#F9FAFB]",
                             )}
                           >
@@ -993,7 +911,7 @@ export function Dashboard() {
                             className={cn(
                               "h-7 rounded-full border px-3 text-[11px] font-medium",
                               activeSources.includes(source)
-                                ? "border-[#0E9384] bg-[#ECFDF3] text-[#0E9384]"
+                                ? "border-[#0E9384] bg-[#E6FFFB] text-[#0E9384]"
                                 : "border-[#EAECF0] bg-white text-[#667085] hover:bg-[#F9FAFB]",
                             )}
                           >
@@ -1013,27 +931,20 @@ export function Dashboard() {
               </CardHeader>
 
               <CardContent className="space-y-2 px-4 pb-4">
-                <div className={cn("rounded-xl border px-3 py-2", isDarkMode ? "border-[#374151] bg-[#111827]" : "border-[#E4E7EC] bg-[#F8FAFC]")}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-[12px] font-semibold text-[#101828]">Mostrando {inboxRows.length} atualizações</p>
-                    {summaryParts.map((part) => (
-                      <span key={part} className="inline-flex h-[22px] items-center rounded-full border border-[#E4E7EC] bg-white px-2 text-[11px] text-[#475467]">
-                        {part}
-                      </span>
-                    ))}
-                    {hasAnyFilterOverride && (
+                {hasAnyFilterOverride && (
+                  <div className={cn("rounded-xl border px-3 py-2", isDarkMode ? "border-[#374151] bg-[#111827]" : "border-[#E4E7EC] bg-[#F8FAFC]")}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {activeFilterChips.map((chip) => (
+                        <span key={chip} className={cn("inline-flex h-[22px] items-center rounded-full border px-2 text-[11px]", isDarkMode ? "border-[#475467] bg-[#0F172A] text-[#CBD5E1]" : "border-[#E4E7EC] bg-white text-[#475467]")}>
+                          {chip}
+                        </span>
+                      ))}
                       <button onClick={clearInboxFilters} className="ml-auto text-[12px] font-semibold text-[#0E9384] hover:text-[#0B7F74]">
                         Limpar filtros
                       </button>
-                    )}
+                    </div>
                   </div>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5">
-                  <Badge className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[11px] text-rose-700">Risco {severityCount.risk}</Badge>
-                  <Badge className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] text-amber-700">Atenção {severityCount.attention}</Badge>
-                  <Badge className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] text-emerald-700">Saudável {severityCount.healthy}</Badge>
-                </div>
+                )}
 
                 {isLoading ? (
                   <div className="space-y-2">
@@ -1059,59 +970,76 @@ export function Dashboard() {
                     </button>
                   </div>
                 ) : (
-                  inboxRows.map((item) => {
-                    const isNew = (newBadgeUntil[item.id] ?? 0) > Date.now();
-                    return (
-                      <button
-                        key={item.id}
+                  <>
+                    {inboxMode === "top-impacto" && priorityItem && (
+                      <div className={cn("rounded-xl border px-3 py-2", isDarkMode ? "border-[#134E48] bg-[#0F2B2A]" : "border-[#99DFD7] bg-[#F0FDFA]")}>
+                        <p className={cn("text-[12px] font-semibold", isDarkMode ? "text-[#99F6E4]" : "text-[#0E9384]")}>
+                          Maior impacto hoje: {priorityItem.ticker}
+                          {priorityItem.pillarKey ? ` em ${priorityItem.pillarKey}` : ""}
+                        </p>
+                      </div>
+                    )}
+                    {inboxRows.map((item, index) => {
+                      const isNew = (newBadgeUntil[item.id] ?? 0) > Date.now();
+                      const isPriority = index === 0 && inboxMode === "top-impacto";
+                      return (
+                        <button
+                          key={item.id}
                         onClick={() => openInboxItem(item)}
                         className={cn(
                           "w-full cursor-pointer rounded-xl border border-transparent p-3 text-left transition hover:border-[#D0D5DD] hover:bg-[#F2F4F7] hover:shadow-[inset_3px_0_0_#0E9384]",
                           isNew && "border-[#B2DDFF] bg-[#F0F9FF]",
+                          isPriority && "border-[#99DFD7] bg-[#F0FDFA] hover:bg-[#ECFDF9] hover:border-[#6ED4C7]",
                         )}
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex min-w-0 items-start gap-2.5">
-                            <Avatar className="h-8 w-8 rounded-md">
-                              <AvatarImage src={logoByTicker[item.ticker]} alt={item.ticker} className="object-cover" />
-                              <AvatarFallback className="rounded-md text-[10px]">{item.ticker.slice(0, 2)}</AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0">
-                              <p className="truncate text-[13px] font-semibold text-[#344054]">
-                                {item.ticker} - {item.companyName}
-                              </p>
-                              <p className="truncate text-[14px] font-medium text-[#101828]">{item.title}</p>
-                              <p className="mt-1 line-clamp-1 text-[12px] text-[#667085]">Por que importa: {item.whyItMatters}</p>
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {item.pillarKey && (
-                                  <span className="inline-flex h-[22px] items-center rounded-full border border-[#E4E7EC] bg-[#F9FAFB] px-2 text-[11px] text-[#475467]">
-                                    {item.pillarKey}
+                            <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                              <Avatar className="h-8 w-8 rounded-md">
+                                <AvatarImage src={logoByTicker[item.ticker]} alt={item.ticker} className="object-cover" />
+                                <AvatarFallback className="rounded-md text-[10px]">{item.ticker.slice(0, 2)}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                {isPriority && (
+                                  <span className={cn("mb-1 inline-flex h-[22px] items-center rounded-full border px-2 text-[11px] font-semibold", isDarkMode ? "border-[#2DD4BF]/40 bg-[#134E48] text-[#CCFBF1]" : "border-[#99DFD7] bg-[#E6FFFB] text-[#0E9384]")}>
+                                    Prioridade 1
                                   </span>
                                 )}
-                                {item.source && (
+                                <p className="truncate text-[13px] font-semibold text-[#344054]">
+                                  {item.ticker} · {item.companyName}
+                                </p>
+                                <p className="truncate text-[14px] font-semibold text-[#101828]">{item.title}</p>
+                                <p className="mt-1 line-clamp-1 text-[12px] text-[#475467]">Por que isso importa: {item.whyItMatters}</p>
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {item.pillarKey && (
+                                    <span className="inline-flex h-[22px] items-center rounded-full border border-[#E4E7EC] bg-[#F9FAFB] px-2 text-[11px] text-[#475467]">
+                                      {item.pillarKey}
+                                    </span>
+                                  )}
+                                  {item.source && (
+                                    <span className="inline-flex h-[22px] items-center rounded-full border border-[#E4E7EC] bg-[#F9FAFB] px-2 text-[11px] text-[#475467]">
+                                      {item.source}
+                                    </span>
+                                  )}
                                   <span className="inline-flex h-[22px] items-center rounded-full border border-[#E4E7EC] bg-[#F9FAFB] px-2 text-[11px] text-[#475467]">
-                                    {item.source}
+                                    {item.relativeTime}
                                   </span>
-                                )}
-                                <span className="inline-flex h-[22px] items-center rounded-full border border-[#E4E7EC] bg-[#F9FAFB] px-2 text-[11px] text-[#475467]">
-                                  {item.relativeTime}
-                                </span>
-                                {isNew && <span className="inline-flex h-[22px] items-center rounded-full border border-sky-300 bg-sky-100 px-2 text-[11px] font-semibold text-sky-900">Novo</span>}
+                                  {isNew && <span className="inline-flex h-[22px] items-center rounded-full border border-sky-300 bg-sky-100 px-2 text-[11px] font-semibold text-sky-900">Novo</span>}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex shrink-0 flex-col items-end gap-2">
+                              <StatusBadge status={item.severity} />
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[12px] font-semibold text-[#0E9384]">{feedCtaLabel(item, isPriority)}</span>
+                                <ChevronRight className="h-4 w-4 text-[#98A2B3]" />
                               </div>
                             </div>
                           </div>
-
-                          <div className="flex shrink-0 flex-col items-end gap-2">
-                            <StatusBadge status={item.severity} />
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[12px] font-semibold text-[#0E9384]">Abrir análise</span>
-                              <ChevronRight className="h-4 w-4 text-[#98A2B3]" />
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })
+                        </button>
+                      );
+                    })}
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1119,7 +1047,9 @@ export function Dashboard() {
             <Card className={cn("rounded-2xl border", isDarkMode ? "border-[#1F2937] bg-[#0F172A]" : "border-[#EAECF0] bg-white")}>
               <CardHeader className="px-4 pt-4">
                 <CardTitle className={cn("text-[16px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>Pilares em movimento</CardTitle>
-                <CardDescription className={cn("text-[14px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>Onde sua watchlist mais mexeu (clique para filtrar a Inbox).</CardDescription>
+                <CardDescription className={cn("text-[14px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>
+                  Veja quais temas concentraram mudanças hoje e clique para filtrar a inbox.
+                </CardDescription>
               </CardHeader>
 
               <CardContent className="space-y-1 px-4">
@@ -1130,25 +1060,23 @@ export function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  pillarMovements.map((item, idx) => (
+                  visiblePillarMovements.map((item, idx) => (
                     <button
                       key={item.pillar}
                       onClick={() => applySinglePillarFilter(item.pillar)}
                       className={cn(
-                        "w-full cursor-pointer rounded-xl border border-transparent p-3 text-left transition hover:border-[#D0D5DD] hover:bg-[#F8FAFC]",
+                        "w-full cursor-pointer rounded-xl border border-transparent p-2.5 text-left transition hover:border-[#D0D5DD] hover:bg-[#F8FAFC]",
                         idx > 0 && "border-t border-t-[#F2F4F7]",
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-[14px] font-medium text-[#101828]">{item.pillar}</p>
-                            <span className="text-[12px] text-[#667085]">{item.events} eventos</span>
-                            <span className={cn("text-[12px] font-medium", item.trendUp ? "text-emerald-600" : "text-rose-600")}>{item.trendLabel}</span>
-                          </div>
-                          <div className="mt-2">
+                          <p className="text-[14px] font-medium text-[#101828]">{item.pillar}</p>
+                          <p className="mt-0.5 text-[12px] text-[#475467]">{item.pillar} {pillarInsight[item.pillar]}.</p>
+                          <div className="mt-1.5">
                             <SegmentedHealthBar healthy={item.healthy} attention={item.attention} risk={item.risk} />
-                            <div className="mt-1 flex items-center gap-3 text-[10px]">
+                            <div className="mt-1 flex flex-wrap items-center gap-3 text-[10px]">
+                              <span className="text-[#667085]">{item.events} eventos</span>
                               <span className="text-rose-600">Risco {item.risk}</span>
                               <span className="text-amber-600">Atenção {item.attention}</span>
                               <span className="text-emerald-600">Saudável {item.healthy}</span>
@@ -1162,13 +1090,13 @@ export function Dashboard() {
                 )}
               </CardContent>
 
-              <CardFooter className="justify-between border-t border-[#F2F4F7] px-4 pt-3 pb-4">
+              <CardFooter className="justify-between border-t border-[#F2F4F7] px-4 pt-3 pb-3.5">
                 <div>
-                  <p className="text-[12px] text-[#667085]">Atualizado {refreshLabel} • CVM / B3 / RI</p>
+                  <p className="text-[12px] text-[#667085]">Atualizado {refreshLabel} · Fontes: CVM / B3 / RI</p>
                   {sourceFailed && <p className="text-[12px] text-amber-700">1 fonte falhou hoje; tentaremos novamente.</p>}
                 </div>
-                <button onClick={() => applySinglePillarFilter(focusedPillar)} className="text-[12px] font-medium text-[#0E9384] hover:text-[#0B7F74]">
-                  Ver empresas afetadas
+                <button onClick={() => applySinglePillarFilter(focusedPillar)} className="text-[12px] font-semibold text-[#0E9384] hover:text-[#0B7F74]">
+                  Filtrar empresas afetadas
                 </button>
               </CardFooter>
             </Card>

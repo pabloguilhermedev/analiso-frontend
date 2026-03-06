@@ -9,7 +9,7 @@ export function TopBar({}: TopBarProps) {
   const [search, setSearch] = useState("");
 
   return (
-    <header className="dash-top fixed left-0 right-0 top-0 z-20 h-16 border-b border-[#EAECF0] bg-white lg:left-[240px]">
+    <header className="dash-top fixed left-0 right-0 top-0 z-20 h-16 border-b border-[#EAECF0] bg-white lg:left-[88px]">
       <div className="flex h-full items-center justify-between gap-4 px-5 lg:px-8">
         <div>
           <p className="text-base font-semibold text-[#0B1220]">Bem-vindo de volta, Pablo!</p>
