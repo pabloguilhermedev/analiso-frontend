@@ -1,4 +1,5 @@
-﻿import {
+import {
+  ArrowUpRight,
   BellRing,
   ChartColumn,
   ClipboardList,
@@ -67,7 +68,7 @@ export function FeaturesSection({ features }: FeaturesSectionProps) {
             return (
               <article
                 key={`feature-grid-${card.title}`}
-                className="rounded-2xl border border-[#E8EAED] bg-white p-6 text-center md:w-[302.5px] md:h-[233px]"
+                className="rounded-2xl border border-[#E8EAED] bg-white p-6 text-center transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[0_10px_24px_rgba(15,23,42,0.10)] md:h-[233px] md:w-[302.5px]"
               >
                 <span className="mx-auto inline-flex h-[64px] w-[64px] items-center justify-center rounded-full bg-[#E8F6F4] text-[#0E9384]">
                   <Icon className="h-7 w-7" />
@@ -80,15 +81,19 @@ export function FeaturesSection({ features }: FeaturesSectionProps) {
 
           <Link
             to="/signup"
-            className="flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#14B8A6_0%,#0E9384_100%)] p-6 text-center text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E9384] focus-visible:ring-offset-2 md:w-[302.5px] md:h-[233px]"
+            className="flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#14B8A6_0%,#0E9384_100%)] p-6 text-center text-white transition-all duration-200 ease-out hover:-translate-y-1 hover:brightness-95 hover:shadow-[0_10px_24px_rgba(15,23,42,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E9384] focus-visible:ring-offset-2 md:h-[233px] md:w-[302.5px]"
           >
-            <span style={{ color: "#fff", fontSize: "18px", lineHeight: "21.6px", letterSpacing: "-1px", fontWeight: 600 }}>Conhecer a Analiso</span>
+            <span className="inline-flex items-center gap-1" style={{ color: "#fff", fontSize: "18px", lineHeight: "21.6px", letterSpacing: "-1px", fontWeight: 600 }}>
+              Conhecer a Analiso
+              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+            </span>
           </Link>
         </div>
       </div>
     </section>
   );
 }
+
 
 
 

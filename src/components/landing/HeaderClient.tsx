@@ -12,34 +12,8 @@ interface HeaderClientProps {
 
 export function HeaderClient({ navLinks }: HeaderClientProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const isScrolledRef = useRef(false);
-
-  useEffect(() => {
-    let rafId = 0;
-
-    const onScroll = () => {
-      if (rafId) return;
-      rafId = window.requestAnimationFrame(() => {
-        const next = window.scrollY > 80;
-        if (next !== isScrolledRef.current) {
-          isScrolledRef.current = next;
-          setIsScrolled(next);
-        }
-        rafId = 0;
-      });
-    };
-
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (rafId) window.cancelAnimationFrame(rafId);
-    };
-  }, []);
 
   useEffect(() => {
     if (!mobileMenuOpen) {
@@ -60,12 +34,8 @@ export function HeaderClient({ navLinks }: HeaderClientProps) {
   const closeMenu = () => setMobileMenuOpen(false);
 
   return (
-    <header
-      className={`sticky top-0 z-[100] border-b border-[#E8EAED] transition ${
-        isScrolled ? "bg-white/85 backdrop-blur-xl" : "bg-white"
-      }`}
-    >
-      <div className="mx-auto hidden h-16 w-full max-w-[1454px] items-center justify-between px-10 md:flex">
+    <header className="hero-header">
+      <div className="hidden h-16 w-full items-center justify-between md:flex">
         <LogoMark />
 
         <nav className="flex items-center gap-8 text-[15px] font-medium text-[#111827]" aria-label="Navegação principal">
@@ -96,7 +66,7 @@ export function HeaderClient({ navLinks }: HeaderClientProps) {
         </div>
       </div>
 
-      <div className="mx-auto flex h-16 w-full max-w-[1454px] items-center justify-between px-4 md:hidden">
+      <div className="flex h-16 w-full items-center justify-between px-4 md:hidden">
         <button
           ref={buttonRef}
           type="button"

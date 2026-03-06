@@ -25,7 +25,7 @@ import { InteractivePlatformSection } from "./InteractivePlatformSection";
 export function LandingPage() {
   return (
     <div className="landing-theme min-h-screen bg-[#F4F6F9] text-[#0F0F14]">
-      <main>
+      <main className="landing-main">
         <HeroSection navLinks={navLinks} />
         <AboutAnalisoSection />
         <BeginnerInvestSection />

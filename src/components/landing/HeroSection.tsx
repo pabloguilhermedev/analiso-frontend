@@ -2,6 +2,7 @@
 import { Search } from "lucide-react";
 import type { NavLink } from "../../data/landing";
 import { HeaderClient } from "./HeaderClient";
+import heroImage from "../../assets/landing/hero_image.png";
 
 interface HeroSectionProps {
   navLinks: NavLink[];
@@ -10,7 +11,7 @@ interface HeroSectionProps {
 export function HeroSection({ navLinks }: HeroSectionProps) {
   return (
     <section id="inicio" className="relative overflow-hidden bg-white">
-      <div className="w-full bg-[#0E9384]">
+      <div className="header-banner bg-[#0E9384]">
         <div className="mx-auto flex h-[50px] w-full max-w-[1454px] items-center justify-center px-4">
           <p
             style={{
@@ -29,11 +30,20 @@ export function HeroSection({ navLinks }: HeroSectionProps) {
 
       <HeaderClient navLinks={navLinks} />
 
-      <div className="relative mx-auto min-h-[760px] w-full max-w-[1454px] bg-white">
-        <div className="relative z-10 mx-auto flex min-h-[760px] w-full max-w-[1454px] items-center justify-center px-5 py-14 md:px-10">
+      <div
+        className="relative mx-auto mt-[34px] h-[850px] w-full max-w-[1454px] bg-white"
+        style={{
+          backgroundSize: "cover",
+          backgroundPosition: "center center",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          position: "relative",
+        }}
+      >
+        <div className="relative z-10 mx-auto flex h-full w-full max-w-[1454px] items-center justify-center px-5 py-14 md:px-10">
           <div
-            className="flex h-full w-full flex-col items-center justify-center text-center"
-            style={{ maxWidth: "894px", margin: "auto", padding: "0 20px 107px", gap: "34px" }}
+            className="hero-content"
           >
             <p
               className="inline-flex items-center"
@@ -44,15 +54,34 @@ export function HeroSection({ navLinks }: HeroSectionProps) {
             </p>
 
             <h1
-              className="mx-auto max-w-[900px]"
-              style={{ color: "#101727", fontWeight: 600, fontSize: "60px", lineHeight: "66px" }}
+              className="mx-auto mt-2 max-w-[900px]"
+              style={{ color: "#101727", fontWeight: 600, fontSize: "60px", lineHeight: "66px", wordSpacing: "0.06em" }}
             >
-              Feita para quem quer analisar
+              Feita para quem quer
               <br />
-              com clareza, não com confusão.
+              analisar com clareza,
+              <br />
+              não com{" "}
+              <span className="-mx-6 inline-block" style={{ verticalAlign: "-0.48em" }}>
+                <img
+                  src={heroImage}
+                  alt="Hero"
+                  className="hero-image"
+                />
+              </span>{" "}
+              confusão.
             </h1>
 
-            <p className="mx-auto max-w-[760px] text-[22px] leading-[1.4] text-[#4B5563]">
+            <p
+              className="-mt-[14px] mx-auto max-w-[760px]"
+              style={{
+                color: "#413e52",
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "130%",
+                textWrap: "balance",
+              }}
+            >
               Com contexto e fonte oficial, mostramos o que realmente importa.
               <br />
               Entenda empresas e acompanhe mudanças com confiança.

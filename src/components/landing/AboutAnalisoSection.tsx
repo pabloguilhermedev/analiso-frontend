@@ -62,8 +62,14 @@ export function AboutAnalisoSection() {
               {["Clareza", "Confiança", "Decisão"].map((pill) => (
                 <span
                   key={pill}
-                  className="inline-flex items-center rounded-full border border-[#DDE1E6] bg-white px-6 py-3"
-                  style={{ color: "#413E52", fontSize: "16px", fontWeight: 600, lineHeight: "150%", letterSpacing: "-1px" }}
+                  className="inline-flex items-center rounded-[40px] px-[22px] py-[12px] outline outline-1"
+                  style={{
+                    background: "rgba(223, 223, 223, 0.11)",
+                    outlineColor: "rgba(33, 33, 33, 0.11)",
+                    color: "#413E52",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                  }}
                 >
                   {pill}
                 </span>

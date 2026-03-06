@@ -2,9 +2,11 @@ import {
   BellRing,
   ChartColumn,
   ClipboardList,
+  Clock3,
   LayoutDashboard,
 } from "lucide-react";
 import type { Step } from "../../data/landing";
+import resumoBannerImage from "../../assets/landing/resumo-banner-image.png";
 
 interface StepsSectionProps {
   steps: Step[];
@@ -113,43 +115,43 @@ export function StepsSection({ steps }: StepsSectionProps) {
           })}
           </div>
 
-          <article className="mx-auto mt-6 flex flex-col items-start justify-center rounded-2xl border border-[#0B7F74] bg-[#0E9384] p-5 text-left md:h-[172px] md:w-[1220px] md:p-6">
-          <p
-            style={{
-              color: "#fff",
-              fontSize: "18px",
-              lineHeight: "21.6px",
-              letterSpacing: "-1px",
-              fontWeight: 600,
-            }}
-          >
-            Resumo em 60s com evidencias oficiais
-          </p>
-          <p className="mt-2 max-w-[880px]"
-            style={{
-              color: "rgba(255, 255, 255, 0.6)",
-              fontSize: "16px",
-              fontWeight: 400,
-              lineHeight: "20.8px",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            Veja os principais sinais e riscos com contexto e abra a fonte CVM/B3/RI sem sair da tela.
-          </p>
+          <article className="resumo-banner relative mx-auto mt-6 gap-4 border border-[#0B7F74] bg-[#0E9384] text-left md:w-[1220px]">
+          <span className="icon-box white">
+            <Clock3 className="h-7 w-7 text-[#0E9384]" />
+          </span>
+          <div>
+            <p
+              style={{
+                color: "#fff",
+                fontSize: "18px",
+                lineHeight: "21.6px",
+                letterSpacing: "-1px",
+                fontWeight: 600,
+              }}
+            >
+              Resumo em 60s com evidencias oficiais
+            </p>
+            <p className="mt-2 max-w-[880px]"
+              style={{
+                color: "rgba(255, 255, 255, 0.6)",
+                fontSize: "16px",
+                fontWeight: 400,
+                lineHeight: "20.8px",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              Veja os principais sinais e riscos com contexto e abra a fonte CVM/B3/RI sem sair da tela.
+            </p>
+          </div>
+          <div className="pointer-events-none absolute -right-20 top-1/2 h-[280px] w-[520px] -translate-y-1/2">
+            <img src={resumoBannerImage} alt="Resumo com evidências" className="h-full w-full object-cover object-right" loading="lazy" />
+          </div>
           </article>
         </div>
       </div>
     </section>
   );
 }
-
-
-
-
-
-
-
-
 
 
 

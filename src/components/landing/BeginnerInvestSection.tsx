@@ -1,5 +1,5 @@
 ﻿import { Link } from "react-router-dom";
-import { BellRing, ChevronDown, LayoutDashboard, ShieldCheck } from "lucide-react";
+import { BellRing, ChevronDown, FileText, Pentagon } from "lucide-react";
 import valeLogo from "../../assets/logos/vale.png";
 import rennerLogo from "../../assets/logos/renner.png";
 import fleuryLogo from "../../assets/logos/fleury.png";
@@ -244,21 +244,21 @@ export function BeginnerInvestSection() {
 
   const cards = [
     {
-      title: "Processo visual",
-      description: "Mostra o que precisa da sua atenção.",
-      icon: LayoutDashboard,
+      title: "Pilares claros",
+      description: "Veja a saúde da empresa em 5 pilares, com explicação simples e contexto.",
+      icon: Pentagon,
       customMedia: <DashboardMockup active="Pilares" company={valeCompany} />,
     },
     {
-      title: "Alertas inteligentes",
-      description: "Avisam quando há mudanças que exigem ação.",
+      title: "Mudanças que importam",
+      description: "Veja o que mudou, por que importa e onde está a evidência.",
       icon: BellRing,
       customMedia: <DashboardMockup active="O que mudou" company={rennerCompany} />,
     },
     {
-      title: "Organização pensada",
-      description: "Cada empresa no lugar certo, sem confusão.",
-      icon: ShieldCheck,
+      title: "Fontes verificáveis",
+      description: "Cada número com documento e data para você conferir quando quiser",
+      icon: FileText,
       customMedia: <DashboardMockup active="Fontes" company={fleuryCompany} />,
     },
   ];
@@ -297,10 +297,10 @@ export function BeginnerInvestSection() {
           {cards.map((card) => {
             const Icon = card.icon;
             return (
-              <article key={card.title} className="rounded-[22px] border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+              <article key={card.title} className="rounded-[22px] border border-[#E5E7EB] p-4">
                 <div className="h-[500px] w-full overflow-hidden rounded-[18px]">{card.customMedia}</div>
 
-                <div className="mt-4 rounded-[16px] border border-[#E5E7EB] bg-white p-4">
+                <div className="mt-4 rounded-[16px] border border-[#E5E7EB] p-4">
                   <p className="inline-flex items-center gap-2" style={{ color: "#101727", fontSize: "18px", fontWeight: 600, lineHeight: "21.6px", letterSpacing: "-1px" }}>
                     <Icon className="h-5 w-5 text-[#0E9384]" />
                     {card.title}
@@ -315,8 +315,9 @@ export function BeginnerInvestSection() {
         </div>
 
         <div className="mt-8 flex flex-col items-center justify-between gap-4 md:flex-row md:items-center">
-          <p style={{ color: "#413E52", fontSize: "16px", fontWeight: 600, lineHeight: "150%", letterSpacing: "-1px" }}>
-            É assim que você sai da dúvida para decisões com mais clareza e confiança.
+          <p style={{ fontSize: "16px", lineHeight: "150%", letterSpacing: "-1px" }}>
+            <span className="banner-sub">É assim que você sai da dúvida e </span>
+            <span className="banner-strong">decide com clareza e confiança.</span>
           </p>
 
           <Link
