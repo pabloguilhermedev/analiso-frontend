@@ -602,6 +602,7 @@ export function Dashboard() {
     {
       title: "Maior risco hoje",
       value: topRiskItem ? topRiskItem.ticker : "Sem risco novo",
+      logoTicker: topRiskItem ? topRiskItem.ticker : null,
       subtitle: topRiskItem
         ? `${topRiskItem.title}`
         : "Nenhum sinal crítico novo nas últimas 24h",
@@ -615,6 +616,7 @@ export function Dashboard() {
     {
       title: "Maior melhora",
       value: topImproveItem ? topImproveItem.ticker : "Sem melhora nova",
+      logoTicker: topImproveItem ? topImproveItem.ticker : null,
       subtitle: topImproveItem
         ? `${topImproveItem.title}`
         : "Sem recuperação relevante registrada hoje",
@@ -626,6 +628,7 @@ export function Dashboard() {
     {
       title: "Pilar mais movimentado",
       value: leadingPillarMovement.pillar,
+      logoTicker: null,
       subtitle: `${leadingPillarMovement.pillar} concentrou a maior parte das mudanças do dia`,
       delta: `${leadingPillarMovement.events} eventos · maioria em atenção`,
       ctaLabel: "Filtrar por pilar",
@@ -635,6 +638,7 @@ export function Dashboard() {
     {
       title: "Saúde da watchlist",
       value: `${healthyWatchlistCount} de ${totalWatchlistCount}`,
+      logoTicker: null,
       subtitle: "empresas seguem sem sinais relevantes hoje",
       delta: "+2,1 p.p. vs semana passada",
       ctaLabel: "Ver composição",
@@ -775,7 +779,15 @@ export function Dashboard() {
                 )}
               >
                 <p className={cn("mb-2 text-[12px] font-medium", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>{card.title}</p>
-                <p className={cn("text-[17px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>{card.value}</p>
+                <div className="flex items-center gap-2">
+                  {card.logoTicker && logoByTicker[card.logoTicker] ? (
+                    <Avatar className="h-7 w-7 rounded-md">
+                      <AvatarImage src={logoByTicker[card.logoTicker]} alt={card.logoTicker} className="object-cover" />
+                      <AvatarFallback className="rounded-md text-[10px]">{card.logoTicker.slice(0, 2)}</AvatarFallback>
+                    </Avatar>
+                  ) : null}
+                  <p className={cn("text-[17px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>{card.value}</p>
+                </div>
                 <p className={cn("mt-1.5 text-[12px] leading-snug", isDarkMode ? "text-[#CBD5E1]" : "text-[#344054]")}>{card.subtitle}</p>
                 <p className={cn("mt-2.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium", card.accent)}>{card.delta}</p>
                 <div className="mt-2.5 flex items-center justify-between">
