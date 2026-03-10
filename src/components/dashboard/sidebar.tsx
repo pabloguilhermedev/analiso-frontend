@@ -44,17 +44,17 @@ export function Sidebar({ currentPage = "dashboard" }: SidebarProps) {
     items.map((item) => {
       const Icon = item.icon;
       const isActive = currentPage === item.id;
-      const className = `group relative grid h-11 w-11 place-items-center rounded-full border transition-colors ${
+      const className = `group relative grid h-10 w-10 place-items-center rounded-xl border transition-colors ${
         isActive
-          ? "border-[#0E9384] bg-[#0E9384] text-white shadow-[0_8px_18px_rgba(14,147,132,0.28)]"
-          : "border-transparent text-[#9CA3AF] hover:border-[#99F6E4] hover:bg-[#E9F8F5] hover:text-[#0E9384]"
+          ? "border-mint-200 bg-mint-50 text-mint-700"
+          : "border-transparent text-slate-400 hover:border-slate-200 hover:bg-white hover:text-slate-700"
       }`;
 
       if (item.href.startsWith("/")) {
         return (
           <Link key={item.id} to={item.href} className={className} title={item.label} aria-label={item.label}>
             <Icon className="h-[18px] w-[18px]" />
-            {isActive ? <span className="pointer-events-none absolute -right-[22px] h-2 w-2 rounded-full bg-[#D5EAFF]" /> : null}
+            {isActive ? <span className="pointer-events-none absolute -right-[14px] h-1.5 w-1.5 rounded-full bg-mint-500" /> : null}
           </Link>
         );
       }
@@ -67,29 +67,25 @@ export function Sidebar({ currentPage = "dashboard" }: SidebarProps) {
     });
 
   return (
-    <aside className="dash-side fixed left-0 top-0 z-30 h-screen w-[88px] border-r border-[#E5E7EB] bg-[#F5F5F5]">
+    <aside className="dash-side fixed left-0 top-0 z-30 h-screen w-[88px] border-r border-slate-200 bg-slate-50">
       <div className="flex h-full flex-col items-center px-3 py-4">
         <img src={logo} alt="Analiso" className="h-11 w-11 object-contain" />
 
-        <nav className="mt-5 flex w-full flex-col items-center gap-3">
-          {renderItems(primaryItems)}
-        </nav>
+        <nav className="mt-5 flex w-full flex-col items-center gap-3">{renderItems(primaryItems)}</nav>
 
-        <div className="my-4 h-px w-12 border-t border-dashed border-[#D9B97F]" />
+        <div className="my-4 h-px w-10 bg-slate-200" />
 
-        <nav className="flex w-full flex-col items-center gap-3">
-          {renderItems(secondaryItems)}
-        </nav>
+        <nav className="flex w-full flex-col items-center gap-3">{renderItems(secondaryItems)}</nav>
 
-        <div className="my-4 h-px w-12 border-t border-dashed border-[#8DC4A3]" />
+        <div className="my-4 h-px w-10 bg-slate-200" />
 
         <div className="mt-auto">
           <button
             title="Perfil"
             aria-label="Perfil"
-            className="grid h-10 w-10 place-items-center rounded-full border border-[#D1D5DB] bg-white text-[#9CA3AF] shadow-sm hover:text-[#0E9384]"
+            className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm transition-colors hover:text-slate-700"
           >
-            <UserCircle2 className="h-6 w-6" />
+            <UserCircle2 className="h-5 w-5" />
           </button>
         </div>
       </div>

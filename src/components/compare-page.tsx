@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowRightLeft,
@@ -330,6 +330,39 @@ const trendContext = (trend: Trend) => {
   if (trend === "piorando") return "Tendencia recente pede cautela";
   return "Tendencia recente esta estavel";
 };
+const trendNarrative = (trend: Trend, ticker: string) => {
+  if (trend === "melhorando") return `${ticker} ganhou tracao recente`;
+  if (trend === "piorando") return `${ticker} perdeu tracao recente`;
+  return `${ticker} ficou estavel no periodo`;
+};
+const summarizeWinners = (items: Array<{ p: Pillar; winner: Company }>) => {
+  const bucket = new Map<string, Pillar[]>();
+  items.forEach((item) => {
+    const current = bucket.get(item.winner.ticker) ?? [];
+    current.push(item.p);
+    bucket.set(item.winner.ticker, current);
+  });
+  const leader = [...bucket.entries()].sort((x, y) => y[1].length - x[1].length)[0];
+  if (!leader) return "";
+  const [ticker, pillars] = leader;
+  const labels = pillars.slice(0, 3).map((p) => PILLAR_LABEL[p]);
+  return `${ticker} abre vantagem em ${labels.join(", ")}.`;
+};
+const pillarConsequence = (pillar: Pillar, delta: number, winner: string) => {
+  const intensity = delta >= 1.5 ? "diferenca relevante" : delta >= 0.8 ? "diferenca moderada" : "diferenca pequena";
+  if (pillar === "Divida") return `${intensity}: ${winner} opera com menor pressao financeira hoje.`;
+  if (pillar === "CaixaFCF") return `${intensity}: ${winner} tem mais folga para investir sem estresse de caixa.`;
+  if (pillar === "Margens") return `${intensity}: ${winner} sustenta melhor eficiencia operacional no ciclo atual.`;
+  if (pillar === "Retorno") return `${intensity}: ${winner} converte capital em resultado com mais consistencia.`;
+  return `${intensity}: ${winner} mostra previsibilidade maior na distribuicao ao acionista.`;
+};
+const evidenceReadLabel = (delta: number | null) => {
+  if (delta === null) return "Dados insuficientes";
+  if (delta >= 3) return "Vantagem clara";
+  if (delta >= 1.2) return "Vantagem relevante";
+  if (delta >= 0.5) return "Vantagem leve";
+  return "Diferenca pequena";
+};
 const TICKER_LOGOS: Record<string, string> = {
   WEGE3: wegLogo,
   VALE3: valeLogo,
@@ -434,6 +467,7 @@ const LoadingBlocks = () => (
 
 export function ComparePage() {
   const detailRef = useRef<HTMLDivElement | null>(null);
+  const verdictRef = useRef<HTMLElement | null>(null);
   const mounted = useRef(false);
   const [selectedTickers, setSelectedTickers] = useState<string[]>(["WEGE3", "VALE3"]);
   const [search, setSearch] = useState("");
@@ -446,7 +480,7 @@ export function ComparePage() {
   const [evidence, setEvidence] = useState<Evidence | null>(null);
   const [toast, setToast] = useState("");
   const [compactSticky, setCompactSticky] = useState(false);
-  const [compactSearchOpen, setCompactSearchOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   const selected = useMemo(
     () => selectedTickers.map((t) => companies.find((c) => c.ticker === t)).filter(Boolean) as Company[],
@@ -481,6 +515,13 @@ export function ComparePage() {
     const t = window.setTimeout(() => setToast(""), 2200);
     return () => window.clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const close = () => setActionsOpen(false);
+    window.addEventListener("scroll", close, { passive: true });
+    return () => window.removeEventListener("scroll", close);
+  }, [actionsOpen]);
 
   useEffect(() => {
     const onScroll = () => setCompactSticky(window.scrollY > 110);
@@ -557,6 +598,7 @@ export function ComparePage() {
       biggestGap,
       keyRisk,
       reasons,
+      consequence: summarizeWinners(topPillarDiffs),
       confidence: confidenceLabel(pair),
       latestUpdate: pair.map((c) => c.updatedAt).sort((x, y) => parseDate(y) - parseDate(x))[0],
     };
@@ -601,12 +643,44 @@ export function ComparePage() {
     () => recentEvents.filter((event) => event.impact === activePillar).length,
     [recentEvents, activePillar],
   );
+  const mainExplainer = useMemo(() => {
+    if (!a || !b) return "";
+    const aScore = a.pillars[activePillar].score;
+    const bScore = b.pillars[activePillar].score;
+    const winner = aScore >= bScore ? a : b;
+    const loser = winner.ticker === a.ticker ? b : a;
+    const winnerTrend = trendFromSeries(winner.pillars[activePillar].series);
+    const loserTrend = trendFromSeries(loser.pillars[activePillar].series);
+    const ranked = [...recentEvents].sort((x, y) => parseDate(y.date) - parseDate(x.date));
+    const head = ranked[0];
+    const eventClause = head ? ` O evento mais relevante foi ${head.summary.toLowerCase()} (${head.ticker}, ${head.date}).` : "";
+    return `Nos ultimos 90 dias, a diferenca em ${PILLAR_LABEL[activePillar]} ampliou porque ${trendNarrative(winnerTrend, winner.ticker)}, enquanto ${trendNarrative(loserTrend, loser.ticker)}.${eventClause}`;
+  }, [a, b, activePillar, recentEvents]);
   const latestChartDelta = useMemo(() => {
     if (!chartData.length) return null;
     const last = chartData[chartData.length - 1];
     if (last?.a === null || last?.b === null || last?.a === undefined || last?.b === undefined) return null;
     return Math.abs(Number(last.a) - Number(last.b));
   }, [chartData]);
+  const latestChartLeader = useMemo(() => {
+    if (!a || !b || !chartData.length) return null;
+    const last = chartData[chartData.length - 1];
+    if (last?.a === null || last?.b === null || last?.a === undefined || last?.b === undefined) return null;
+    const betterIsHigher = a.pillars[activePillar].thresholdLabel.toLowerCase().includes("maior");
+    if (last.a === last.b) return null;
+    const winnerIsA = betterIsHigher ? Number(last.a) > Number(last.b) : Number(last.a) < Number(last.b);
+    return winnerIsA ? a.ticker : b.ticker;
+  }, [a, b, activePillar, chartData]);
+  const activePillarScoreWinner = useMemo(() => {
+    if (!a || !b) return null;
+    return a.pillars[activePillar].score >= b.pillars[activePillar].score ? a.ticker : b.ticker;
+  }, [a, b, activePillar]);
+  const scoreVsChartContext = useMemo(() => {
+    if (!a || !b || !latestChartLeader || !activePillarScoreWinner || latestChartLeader === activePillarScoreWinner) return null;
+    const scoreWinner = activePillarScoreWinner === a.ticker ? a : b;
+    const chartWinner = latestChartLeader === a.ticker ? a : b;
+    return `Apesar de ${chartWinner.ticker} liderar no ponto mais recente do grafico, ${scoreWinner.ticker} fecha melhor o pilar por combinacao entre metricas, estabilidade e leitura agregada.`;
+  }, [a, b, latestChartLeader, activePillarScoreWinner]);
   const qualityTone = useMemo(() => {
     const latest = pair.map((c) => c.updatedAt).sort((x, y) => parseDate(y) - parseDate(x))[0];
     const hasCriticalGap = pair.some((c) => c.gaps.some((g) => g.toLowerCase().includes("critico")));
@@ -654,60 +728,47 @@ export function ComparePage() {
       </div>
       <TopBar updatedAt="07/02/2026" />
       <main className="pt-16 lg:ml-[88px]">
-        <div className="mx-auto max-w-[1240px] px-4 py-8 sm:px-6 lg:px-8">
-          <section className={`sticky top-16 z-30 mb-7 rounded-[20px] border border-[#E7EAEE] bg-white/95 shadow-[0_6px_16px_rgba(15,23,42,0.05)] backdrop-blur transition-all ${compactSticky ? "p-2" : "p-2.5"}`}>
-            <div className="flex flex-col gap-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
+        <div className="px-8 py-8">
+          <section className={`sticky top-16 z-30 mb-6 rounded-[18px] border border-[#DCE3EA] bg-[#FDFEFE]/95 shadow-[0_10px_24px_rgba(15,23,42,0.06)] backdrop-blur transition-all ${compactSticky ? "p-2" : "p-2.5"}`}>
+            <div className="grid grid-cols-1 gap-2 xl:grid-cols-12">
+              <article className="rounded-2xl border border-[#D5DEE7] bg-[#F4F8FB] p-2.5 xl:col-span-7">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#64748B]">Setup da comparacao</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {selected.map((c, i) => (
                     <span
                       key={c.ticker}
-                      className={`inline-flex items-center gap-2 rounded-xl border border-[#E7EAEE] bg-white font-medium text-[#0F172A] transition-all ${compactSticky ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}
+                      className="inline-flex items-center gap-2 rounded-xl border border-[#E7EAEE] bg-white px-3 py-1.5 text-xs font-medium text-[#0F172A]"
                     >
                       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: SLOT_COLORS[i] }} />
-                      <TickerLogo ticker={c.ticker} size={compactSticky ? 14 : 16} />
+                      <TickerLogo ticker={c.ticker} size={16} />
                       {i === 0 ? "Empresa A" : i === 1 ? "Empresa B" : `Empresa ${i + 1}`}: {c.ticker}
-                      <button
-                        onClick={() => setSelectedTickers((p) => p.filter((t) => t !== c.ticker))}
-                        className="rounded-full p-0.5 hover:bg-black/5"
-                      >
+                      <button onClick={() => setSelectedTickers((p) => p.filter((t) => t !== c.ticker))} className="rounded-full p-0.5 hover:bg-black/5">
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </span>
                   ))}
-                  {!compactSticky && selected.length < 4 ? (
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {selected.length < 4 ? (
                     <button
                       onClick={() => setOpenPicker((v) => !v)}
-                      className="inline-flex items-center gap-1 rounded-xl border border-dashed border-[#E7EAEE] px-2.5 py-1.5 text-xs font-medium text-[#475569] hover:border-[#0E9384]"
+                      className="inline-flex items-center gap-1 rounded-xl border border-dashed border-[#E7EAEE] bg-white px-2.5 py-1.5 text-xs font-medium text-[#475569] hover:border-[#0E9384]"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Adicionar empresa
                     </button>
                   ) : null}
-                  {!compactSticky && selected.length >= 2 ? (
+                  {selected.length >= 2 ? (
                     <button
                       onClick={() => setSelectedTickers((v) => (v.length < 2 ? v : [v[1], v[0], ...v.slice(2)]))}
-                      className="inline-flex items-center gap-1 rounded-xl border border-[#E7EAEE] bg-[#F8FAFC] px-2.5 py-1.5 text-xs font-medium text-[#475569]"
+                      className="inline-flex items-center gap-1 rounded-xl border border-[#E7EAEE] bg-white px-2.5 py-1.5 text-xs font-medium text-[#475569]"
                     >
                       <ArrowRightLeft className="h-3.5 w-3.5" />
                       Trocar A/B
                     </button>
                   ) : null}
                 </div>
-                <div className="flex items-center rounded-xl border border-[#E7EAEE] bg-[#F8FAFC] p-0.5">
-                  {RANGES.map((r) => (
-                    <button
-                      key={r.key}
-                      onClick={() => setRange(r.key)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-medium ${range === r.key ? "bg-[#0E9384] text-white" : "text-[#475569]"}`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                {!compactSticky ? <div className="relative w-full max-w-[420px]">
+                <div className="relative mt-2.5 w-full max-w-[420px]">
                   <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-[#94A3B8]" />
                   <input
                     value={search}
@@ -736,58 +797,84 @@ export function ComparePage() {
                       )}
                     </div>
                   ) : null}
-                </div> : <div className="relative">
+                </div>
+              </article>
+              <article className="rounded-2xl border border-[#D5DEE7] bg-[#FAFCFE] p-2.5 xl:col-span-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#64748B]">Leitura da comparacao</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <div className="flex items-center rounded-xl border border-[#E7EAEE] bg-[#F8FAFC] p-0.5">
+                    {RANGES.map((r) => (
+                      <button
+                        key={r.key}
+                        onClick={() => setRange(r.key)}
+                        className={`rounded-lg px-2.5 py-1 text-xs font-medium ${range === r.key ? "bg-[#0E9384] text-white" : "text-[#475569]"}`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  {canCompare ? (
+                    <button
+                      onClick={() => verdictRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-[#0E9384] px-3 text-xs font-semibold text-white"
+                    >
+                      Ver veredito
+                    </button>
+                  ) : null}
+                  {canCompare ? <span className="rounded-lg border border-[#E7EAEE] bg-[#F8FAFC] px-2 py-1 text-[11px] text-[#475569]">Pilar em foco: {PILLAR_LABEL[activePillar]}</span> : null}
+                </div>
+                <div className="relative mt-2.5">
                   <button
-                    onClick={() => setCompactSearchOpen((v) => !v)}
-                    className="inline-flex h-8 items-center gap-1 rounded-xl border border-[#E7EAEE] bg-white px-2.5 text-xs font-medium text-[#475569]"
+                    onClick={() => setActionsOpen((v) => !v)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[#E7EAEE] bg-white px-2.5 text-xs font-medium text-[#475569]"
                   >
-                    <Search className="h-3.5 w-3.5" />
-                    Buscar
+                    Opcoes da comparacao <ChevronDown className="h-3.5 w-3.5" />
                   </button>
-                  {compactSearchOpen ? (
-                    <div className="absolute z-40 mt-2 w-[320px] rounded-xl border border-[#E7EAEE] bg-white p-2 shadow-xl">
-                      <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-[#94A3B8]" />
-                        <input
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          className="w-full rounded-xl border border-[#E7EAEE] bg-white py-2 pl-9 pr-3 text-sm"
-                          placeholder="Buscar ticker ou nome"
-                        />
-                      </div>
-                      <div className="mt-1 max-h-[220px] overflow-y-auto">
-                        {available.length ? (
-                          available.map((c) => (
-                            <button key={c.ticker} onClick={() => { addTicker(c.ticker); setCompactSearchOpen(false); }} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-[#F8FAFC]">
-                              <div>
-                                <p className="text-xs font-semibold">{c.ticker}</p>
-                                <p className="text-[11px] text-[#475569]">{c.name}</p>
-                              </div>
-                              <span className="text-[11px] text-[#94A3B8]">{c.sector}</span>
-                            </button>
-                          ))
-                        ) : (
-                          <p className="px-3 py-2 text-xs text-[#94A3B8]">Nenhuma empresa encontrada.</p>
-                        )}
-                      </div>
+                  {actionsOpen ? (
+                    <div className="absolute left-0 z-40 mt-2 w-[220px] rounded-xl border border-[#E7EAEE] bg-white p-1.5 shadow-xl">
+                      <button
+                        onClick={() => {
+                          setToast("Comparacao salva.");
+                          setActionsOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-[#334155] hover:bg-[#F8FAFC]"
+                      >
+                        <Bookmark className="h-3.5 w-3.5" />
+                        Salvar comparacao
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const qs = new URLSearchParams({ tickers: selectedTickers.join(","), range, pilar: activePillar });
+                          const link = `${window.location.origin}/comparar?${qs.toString()}`;
+                          try {
+                            await navigator.clipboard.writeText(link);
+                            setToast("Link copiado.");
+                          } catch {
+                            setToast(link);
+                          }
+                          setActionsOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-[#334155] hover:bg-[#F8FAFC]"
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                        Compartilhar
+                      </button>
+                      {canCompare ? (
+                        <button
+                          onClick={() => {
+                            setToast(`Alerta criado para ${PILLAR_LABEL[activePillar]}.`);
+                            setActionsOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-[#0B7A6E] hover:bg-[#F3FBF8]"
+                        >
+                          <Bell className="h-3.5 w-3.5" />
+                          Acompanhar mudancas
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
-                </div>}
-                <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => setToast("Comparacao salva.")} className="inline-flex h-8 items-center gap-2 rounded-xl border border-[#E7EAEE] px-2.5 text-xs font-medium text-[#475569]"><Bookmark className="h-3.5 w-3.5" />Salvar comparacao</button>
-                  <button onClick={async () => {
-                    const qs = new URLSearchParams({ tickers: selectedTickers.join(","), range, pilar: activePillar });
-                    const link = `${window.location.origin}/comparar?${qs.toString()}`;
-                    try {
-                      await navigator.clipboard.writeText(link);
-                      setToast("Link copiado.");
-                    } catch {
-                      setToast(link);
-                    }
-                  }} className="inline-flex h-8 items-center gap-2 rounded-xl border border-[#E7EAEE] px-2.5 text-xs font-medium text-[#475569]"><Share2 className="h-3.5 w-3.5" />Compartilhar</button>
-                  {canCompare ? <div className="inline-flex items-center gap-1"><button onClick={() => setToast(`Alerta criado para ${PILLAR_LABEL[activePillar]}.`)} className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[#D3EAE4] bg-[#F3FBF8] px-2.5 text-xs font-medium text-[#0B7A6E]"><Bell className="h-3.5 w-3.5" />Acompanhar mudancas</button><span className="rounded-lg border border-[#E7EAEE] bg-white px-2 py-1 text-[11px] text-[#475569]">{PILLAR_LABEL[activePillar]}</span></div> : null}
                 </div>
-              </div>
+              </article>
             </div>
           </section>
 
@@ -806,30 +893,35 @@ export function ComparePage() {
           ) : (
             <div className="space-y-8">
               {verdict && a && b ? (
-                <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+                <section ref={verdictRef} className="scroll-mt-[160px] grid grid-cols-1 gap-4 xl:grid-cols-12">
                   <article className="rounded-3xl border border-[#DDE3EA] bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)] xl:col-span-8">
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0E9384]">Veredito da comparacao</p>
                     <h2 className="mt-2 text-[28px] font-semibold leading-tight">
                       {verdict.winner.ticker} aparece mais solida que {verdict.loser.ticker} hoje.
                     </h2>
-                    <p className="mt-3 text-sm text-[#475569]">Baseado em 5 pilares | Dados oficiais de CVM, B3 e RI | Atualizado em {verdict.latestUpdate}</p>
-                    <div className="mt-4 grid grid-cols-1 gap-2 rounded-2xl border border-[#E7EAEE] bg-[#F8FAFC] p-3 sm:grid-cols-3">
-                      <div className="rounded-xl bg-white px-3 py-2">
-                        <p className="text-[11px] text-[#64748B]">{a.ticker}</p>
-                        <p className="text-base font-semibold text-[#0E9384]">{n(scoreboard?.avgA ?? 0, 1)}</p>
-                      </div>
-                      <div className="rounded-xl bg-white px-3 py-2">
-                        <p className="text-[11px] text-[#64748B]">{b.ticker}</p>
-                        <p className="text-base font-semibold text-[#3F5F7D]">{n(scoreboard?.avgB ?? 0, 1)}</p>
-                      </div>
-                      <div className="rounded-xl bg-white px-3 py-2">
-                        <p className="text-[11px] text-[#64748B]">Diferenca</p>
-                        <p className="text-base font-semibold text-[#0F172A]">{n(Math.abs((scoreboard?.avgA ?? 0) - (scoreboard?.avgB ?? 0)), 1)} pts</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#F1F5F9] px-3 py-1.5 text-xs font-medium text-[#334155]">
+                    <p className="mt-2 text-[15px] font-medium text-[#0F172A]">{verdict.consequence}</p>
+                    <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#F1F5F9] px-3 py-1.5 text-xs font-medium text-[#334155]">
                       <Check className="h-3.5 w-3.5 text-[#0E9384]" />
                       Confianca da leitura: {verdict.confidence}
+                    </div>
+                    <p className="mt-3 text-sm text-[#475569]">Baseado em 5 pilares | Dados oficiais de CVM, B3 e RI | Atualizado em {verdict.latestUpdate}</p>
+                    <div className="mt-4 rounded-2xl border border-[#E7EAEE] bg-[#F8FAFC] p-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">Score de apoio da leitura</p>
+                      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <div className="rounded-xl bg-white px-3 py-2">
+                          <p className="text-[11px] text-[#64748B]">{a.ticker}</p>
+                          <p className="text-base font-semibold text-[#0E9384]">{n(scoreboard?.avgA ?? 0, 1)}</p>
+                        </div>
+                        <div className="rounded-xl bg-white px-3 py-2">
+                          <p className="text-[11px] text-[#64748B]">{b.ticker}</p>
+                          <p className="text-base font-semibold text-[#3F5F7D]">{n(scoreboard?.avgB ?? 0, 1)}</p>
+                        </div>
+                        <div className="rounded-xl bg-white px-3 py-2">
+                          <p className="text-[11px] text-[#64748B]">Diferenca</p>
+                          <p className="text-base font-semibold text-[#0F172A]">{n(Math.abs((scoreboard?.avgA ?? 0) - (scoreboard?.avgB ?? 0)), 1)} pts</p>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-[12px] text-[#475569]">Use o score para calibrar intensidade, nao para substituir o contexto dos pilares.</p>
                     </div>
                     <ul className="mt-4 space-y-2 text-sm text-[#334155]">
                       {verdict.reasons.slice(0, 3).map((reason) => (
@@ -895,17 +987,19 @@ export function ComparePage() {
 
               <section className="rounded-2xl border border-[#E7EAEE] bg-white p-6">
                 <h2 className="text-[20px] font-semibold">Todos os pilares</h2>
-                <p className="mt-1 text-sm text-[#475569]">Explore os demais pilares em modo compacto.</p>
+                <p className="mt-1 text-sm text-[#475569]">Veja quem vence, quanto separa e por que isso importa na tese.</p>
                 <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                   {otherPillarDiffs.map((item) => (
                     <button
                       key={item.p}
                       onClick={() => selectPillar(item.p)}
-                      className={`rounded-xl border px-4 py-4 text-left transition-all ${item.p === activePillar ? "border-[#0E9384] bg-[#F4FBF8]" : "border-[#E7EAEE] bg-white hover:border-[#0E938433]"}`}
+                      className={`group rounded-xl border px-4 py-4 text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0E938433] ${item.p === activePillar ? "border-[#0E9384] bg-[#ECFDF6] shadow-[0_12px_24px_rgba(14,147,132,0.14)]" : "border-[#D8E1E9] bg-white hover:-translate-y-1 hover:border-[#0E9384] hover:shadow-[0_14px_24px_rgba(15,23,42,0.12)]"}`}
                     >
-                      <p className="text-sm font-semibold">{PILLAR_LABEL[item.p]}</p>{item.p === activePillar ? <p className="mt-1 text-[11px] font-medium text-[#0E9384]">Pilar em foco</p> : null}
+                      <p className={`text-sm ${item.p === activePillar ? "font-bold text-[#0B7A6E]" : "font-semibold text-[#0F172A]"}`}>{PILLAR_LABEL[item.p]}</p>{item.p === activePillar ? <p className="mt-1 text-[11px] font-semibold text-[#0E9384]">Pilar em foco</p> : null}
                       <p className="mt-1 text-xs text-[#475569]">Vence: {item.winner.ticker}</p>
-                      <p className="mt-2 text-xs font-medium text-[#0F172A]">Delta {n(item.delta, 1)}/10</p><p className="mt-1 text-[11px] text-[#64748B]">Clique para abrir o detalhe</p>
+                      <p className="mt-2 text-xs font-semibold text-[#0F172A]">Delta {n(item.delta, 1)}/10</p>
+                      <p className="mt-2 text-[11px] text-[#334155]">{pillarConsequence(item.p, item.delta, item.winner.ticker)}</p>
+                      <p className="mt-2 text-[11px] font-semibold text-[#0B7A6E] transition-colors group-hover:text-[#0E9384]">Ver detalhe</p>
                     </button>
                   ))}
                 </div>
@@ -950,8 +1044,15 @@ export function ComparePage() {
                             {a.pillars[activePillar].score >= b.pillars[activePillar].score ? a.ticker : b.ticker} mostra trajetoria mais favoravel, enquanto{" "}
                             {a.pillars[activePillar].score >= b.pillars[activePillar].score ? b.ticker : a.ticker} perdeu tracao relativa.
                           </p>
-                          <p className="mt-1 text-[12px] text-[#475569]">Regra de interpretacao: {a.pillars[activePillar].thresholdLabel}</p>
-                          {latestChartDelta !== null ? <p className="mt-1 text-[12px] text-[#475569]">Delta final do periodo: {n(latestChartDelta, 1)}</p> : null}
+                          <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                            <span className="rounded-lg border border-[#D9E2EC] bg-white px-2 py-1 text-[#334155]">Regra: {a.pillars[activePillar].thresholdLabel}</span>
+                            <span className="rounded-lg border border-[#D9E2EC] bg-white px-2 py-1 text-[#334155]">Direcao desejavel: {a.pillars[activePillar].thresholdLabel.toLowerCase().includes("menor") ? "linha descendente" : "linha ascendente"}</span>
+                            {latestChartLeader ? <span className="rounded-lg border border-[#BFE7DF] bg-[#ECFDF6] px-2 py-1 font-medium text-[#0B7A6E]">Vantagem atual: {latestChartLeader}</span> : null}
+                            {latestChartDelta !== null ? <span className="rounded-lg border border-[#D9E2EC] bg-white px-2 py-1 text-[#334155]">Delta final: {n(latestChartDelta, 1)}</span> : null}
+                          </div>
+                          {scoreVsChartContext ? (
+                            <p className="mt-2 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-2.5 py-2 text-[12px] text-[#92400E]">{scoreVsChartContext}</p>
+                          ) : null}
                         </div>
                         <div className="mb-2 flex items-center gap-4 text-xs text-[#475569]">
                           <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#0E9384]" />{a.ticker}</span>
@@ -985,7 +1086,7 @@ export function ComparePage() {
                 {a && b ? (
                   <div className="mt-4 overflow-x-auto rounded-2xl border border-[#E7EAEE]">
                     <table className="min-w-full divide-y divide-[#E7EAEE] text-sm">
-                      <thead className="bg-[#F8FAFC] text-xs font-semibold text-[#334155]"><tr><th className="px-3 py-3 text-left">Metrica</th><th className="px-3 py-3 text-left">{a.ticker}</th><th className="px-3 py-3 text-left">{b.ticker}</th><th className="px-3 py-3 text-left">Delta</th><th className="px-3 py-3 text-left">Winner</th><th className="px-3 py-3 text-left">Fonte</th></tr></thead>
+                      <thead className="bg-[#F8FAFC] text-xs font-semibold text-[#334155]"><tr><th className="px-3 py-3 text-left">Metrica</th><th className="px-3 py-3 text-left">{a.ticker}</th><th className="px-3 py-3 text-left">{b.ticker}</th><th className="px-3 py-3 text-left">Delta</th><th className="px-3 py-3 text-left">Winner</th><th className="px-3 py-3 text-left">Leitura</th><th className="px-3 py-3 text-left">Fonte</th></tr></thead>
                       <tbody className="divide-y divide-[#E7EAEE]">
                         {tableRows.map((row) => {
                           const w = metricWinner(row.direction, row.a?.value ?? null, row.b?.value ?? null);
@@ -995,8 +1096,9 @@ export function ComparePage() {
                               <td className="px-3 py-3 align-top"><p className="font-medium">{row.name}</p><p className="mt-1 text-[11px] text-[#475569]">{row.definition}</p></td>
                               <td className="px-3 py-3 align-top"><p className={`text-[#0E9384] ${w === "a" ? "font-semibold" : "font-medium"}`}>{formatMetric(row.a?.value ?? null, row.unit)}</p>{row.a ? <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-[#64748B]">{trendIcon(row.a.trend)}{trendLabel[row.a.trend]}</p> : <p className="mt-1 text-[11px] text-[#EF4444]">Dados indisponiveis</p>}</td>
                               <td className="px-3 py-3 align-top"><p className={`text-[#3F5F7D] ${w === "b" ? "font-semibold" : "font-medium"}`}>{formatMetric(row.b?.value ?? null, row.unit)}</p>{row.b ? <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-[#64748B]">{trendIcon(row.b.trend)}{trendLabel[row.b.trend]}</p> : <p className="mt-1 text-[11px] text-[#EF4444]">Dados indisponiveis</p>}</td>
-                              <td className="px-3 py-3 align-top font-semibold text-[#0F172A]">{d === null ? "Dados indisponiveis" : `${n(d, row.unit === "x" ? 2 : 1)} ${row.unit}`}</td>
-                              <td className="px-3 py-3 align-top">{w === "a" ? <span className="inline-flex items-center gap-1 rounded-lg bg-[#D9FBEF] px-2 py-1 text-xs font-medium text-[#0E9384]"><Crown className="h-3 w-3" />{a.ticker}</span> : w === "b" ? <span className="inline-flex items-center gap-1 rounded-lg bg-[#ECF3F9] px-2 py-1 text-xs font-medium text-[#3F5F7D]"><Check className="h-3 w-3" />{b.ticker}</span> : <span className="text-[12px] font-semibold text-[#475569]">Empate</span>}</td>
+                              <td className="px-3 py-3 align-top"><span className="inline-flex rounded-md border border-[#D5DEE7] bg-[#F8FAFC] px-2 py-1 text-xs font-semibold text-[#0F172A]">{d === null ? "Dados indisponiveis" : `${n(d, row.unit === "x" ? 2 : 1)} ${row.unit}`}</span></td>
+                              <td className="px-3 py-3 align-top">{w === "a" ? <span className="inline-flex items-center gap-1 rounded-lg border border-[#9FE3CF] bg-[#D9FBEF] px-2 py-1 text-xs font-semibold text-[#0E9384]"><Crown className="h-3 w-3" />{a.ticker}</span> : w === "b" ? <span className="inline-flex items-center gap-1 rounded-lg border border-[#C9DDF0] bg-[#ECF3F9] px-2 py-1 text-xs font-semibold text-[#3F5F7D]"><Check className="h-3 w-3" />{b.ticker}</span> : <span className="inline-flex rounded-md border border-[#D5DEE7] bg-[#F8FAFC] px-2 py-1 text-[12px] font-semibold text-[#475569]">Empate</span>}</td>
+                              <td className="px-3 py-3 align-top"><p className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${d !== null && d >= 1.2 ? "bg-[#ECFDF6] text-[#0B7A6E]" : "bg-[#F8FAFC] text-[#334155]"}`}>{evidenceReadLabel(d)}</p><p className="mt-1 text-[11px] text-[#64748B]">{w === "tie" ? "Sem separacao decisiva." : `${w === "a" ? a.ticker : b.ticker} com leitura mais favoravel neste item.`}</p></td>
                               <td className="px-3 py-3 align-top"><button title="Ver fonte" onClick={() => openEvidence(row)} className="inline-flex items-center gap-1 rounded-lg border border-[#E7EAEE] px-2 py-1.5 text-[11px] text-[#475569] hover:bg-[#F8FAFC]"><FileText className="h-3.5 w-3.5" />Fonte</button></td>
                             </tr>
                           );
@@ -1009,6 +1111,10 @@ export function ComparePage() {
               <section className="rounded-2xl border border-[#E7EAEE] bg-white p-6">
                 <h2 className="text-[20px] font-semibold">O que pode explicar essa diferenca</h2>
                 <p className="mt-1 text-sm text-[#475569]">Contexto recente + como verificamos os dados.</p>
+                <div className="mt-3 rounded-xl border border-[#BFE7DF] bg-[#ECFDF6] px-3.5 py-3 shadow-[0_6px_14px_rgba(14,147,132,0.08)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#64748B]">Sintese principal (90 dias)</p>
+                  <p className="mt-1 text-sm text-[#0F172A]">{mainExplainer}</p>
+                </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-[#E7EAEE] bg-[#F8FAFC] px-3 py-2 text-[12px] text-[#475569]">
                   <span>Atualizado em {pair.map((c) => c.updatedAt).sort((x, y) => parseDate(y) - parseDate(x))[0] ?? "-"}</span>
                   <span>| Fontes CVM/B3/RI</span>
@@ -1035,3 +1141,5 @@ export function ComparePage() {
 }
 
 export default ComparePage;
+
+

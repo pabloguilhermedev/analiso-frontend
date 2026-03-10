@@ -378,9 +378,9 @@ const alertStyles: Record<AlertItem["severity"], string> = {
   "Saudável": "bg-emerald-100 text-emerald-900 border-emerald-300",
 };
 
-const freshnessBadgeStyles: Record<"Atualizado" | "Falha de dados" | "Sem dados", string> = {
+const freshnessBadgeStyles: Record<"Atualizado" | "Dados pendentes" | "Sem dados", string> = {
   Atualizado: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  "Falha de dados": "bg-rose-50 text-rose-700 border-rose-100",
+  "Dados pendentes": "bg-amber-50 text-amber-700 border-amber-100",
   "Sem dados": "bg-neutral-100 text-neutral-700 border-neutral-200",
 };
 
@@ -393,6 +393,7 @@ const pillarTagStyles: Record<Pillar, string> = {
 };
 
 const rangeOptions: Array<"7d" | "30d" | "90d" | "Todos"> = ["7d", "30d", "90d", "Todos"];
+const priorityRankingLabels = ["Maior piora relativa do dia", "Maior pressão estrutural", "Maior sinal de atenção"] as const;
 
 export function WatchlistPage() {
   const navigate = useNavigate();
@@ -500,8 +501,13 @@ export function WatchlistPage() {
     return status === "Risco" || status === "Atenção";
   }).length;
   const summaryRiskCount = watchlistCompanies.filter((company) => getStatusFromScores(company.scores) === "Risco").length;
+  const summaryHealthyCount = watchlistCompanies.filter((company) => getStatusFromScores(company.scores) === "Saudável").length;
   const summaryChanges30dCount = watchlistCompanies.filter((company) => company.lastChangeDays <= 30).length;
   const alertsToShow = showAlertActionOnly ? alerts.filter((alert) => alert.severity !== "Saudável") : alerts;
+  const watchlistExecutiveSummary =
+    summaryAttentionCount > summaryHealthyCount
+      ? "Hoje sua watchlist concentra mais sinais de atenção do que de estabilidade."
+      : "Hoje sua watchlist está mais estável, com menos sinais críticos na triagem.";
 
   const pillarToSlug = (pillar: Pillar) => {
     if (pillar === "Dívida") return "divida";
@@ -523,13 +529,6 @@ export function WatchlistPage() {
     Margens: "margens-1",
     Retorno: "retorno-1",
     Proventos: "proventos-1",
-  };
-
-  const getAttentionSummary = (company: WatchlistCompany) => {
-    const minScore = Math.min(...company.scores);
-    if (minScore >= 70) return "Sem alertas";
-    const minIndex = company.scores.findIndex((score) => score === minScore);
-    return `Pilar em atenção: ${pillars[minIndex]} (${minScore}/100)`;
   };
 
   const getWhyItMatters = (company: WatchlistCompany) => {
@@ -617,14 +616,18 @@ export function WatchlistPage() {
       </header>
 
       <main className="ml-[88px] pt-16">
-        <div className="px-8 py-8">
-          <div className="flex flex-col gap-1">
+        <div className="px-8 py-6">
+          <div className="flex flex-col gap-0.5">
             <h1 className="text-2xl font-semibold text-neutral-900">Watchlist</h1>
-            <p className="text-sm text-neutral-500">Triagem primeiro, organização depois. Foque no que mudou.</p>
+            <p className="text-sm text-neutral-500">
+              {activeTab === "updates"
+                ? "Triagem primeiro, organização depois. Foque no que mudou."
+                : "Organize sua watchlist e acompanhe o estado atual de cada empresa."}
+            </p>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <section className="lg:col-span-9 space-y-4">
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <section className="lg:col-span-9 space-y-3">
               <div className="flex items-center gap-2">
                 {[
                   { key: "updates", label: "Atualizações" },
@@ -694,12 +697,29 @@ export function WatchlistPage() {
                   </div>
                 </div>
               ) : activeTab === "updates" ? (
-                <div className="space-y-6">
+                <div className="space-y-5">
+                  <section className="rounded-2xl border border-mint-200 bg-mint-50/60 p-3.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-mint-800">Estado da watchlist hoje</p>
+                        <p className="mt-1 text-sm font-semibold text-neutral-900">{watchlistExecutiveSummary}</p>
+                        <p className="mt-1 text-xs text-neutral-700">
+                          {summaryRiskCount} em risco, {summaryAttentionCount - summaryRiskCount} em atenção e {summaryHealthyCount} saudáveis.
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-mint-300 bg-white px-2 py-1 text-[11px] font-medium text-mint-800">
+                        {summaryChanges30dCount} mudanças em 30d
+                      </span>
+                    </div>
+                  </section>
+
                   <section className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-5">
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h2 className="text-base font-semibold text-neutral-900">Prioridade</h2>
-                        <p className="text-xs text-neutral-500">Top 3 para agir primeiro.</p>
+                        <p className="text-xs text-neutral-500">
+                          Ordenado pelo que mais merece sua atenção agora: severidade, recência e impacto potencial.
+                        </p>
                       </div>
                       <span className="text-xs text-neutral-400">{Math.min(priorityItems.length, 3)} itens</span>
                     </div>
@@ -733,6 +753,7 @@ export function WatchlistPage() {
                                 {item.company} <span className="text-neutral-400">({item.ticker})</span>
                               </p>
                               <p className="text-xs text-neutral-500">{item.sector}</p>
+                              <p className="mt-1 text-[11px] font-medium text-neutral-700">{priorityRankingLabels[index]}</p>
                             </div>
                             <span
                               className={`px-2 py-1 rounded-full border text-[11px] font-medium ${badgeStyles[item.badge]}`}
@@ -768,7 +789,7 @@ export function WatchlistPage() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h2 className="text-base font-semibold text-neutral-900">Atualizações</h2>
-                        <p className="text-xs text-neutral-500">Feed contínuo com contexto, severidade e fonte.</p>
+                        <p className="text-xs text-neutral-500">Feed contínuo com foco no que pede ação agora.</p>
                       </div>
                       <span className="text-xs text-neutral-400">{filteredFeedItems.length} atualizações</span>
                     </div>
@@ -888,7 +909,13 @@ export function WatchlistPage() {
                               navigate(buildCompanyDeepLink(item.ticker, item.pillar));
                             }
                           }}
-                          className={`rounded-xl border border-neutral-200 border-l-4 bg-neutral-50 p-3 space-y-2 cursor-pointer transition-colors ${clickableItemStyles[item.severity]}`}
+                          className={`rounded-xl border border-neutral-200 border-l-4 bg-neutral-50 cursor-pointer transition-colors ${clickableItemStyles[item.severity]} ${
+                            item.severity === "Risco"
+                              ? "p-3 space-y-2"
+                              : item.severity === "Atenção"
+                                ? "p-2.5 space-y-1.5"
+                                : "p-2 space-y-1"
+                          }`}
                         >
                           <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-neutral-950">{item.headline}</h3>
@@ -907,9 +934,11 @@ export function WatchlistPage() {
                           </div>
                           <div className="text-sm text-neutral-800">
                             <GlossaryText text={item.detail} />
-                            <p className="mt-1 text-neutral-700">
-                              <GlossaryText text={item.detailTwo} />
-                            </p>
+                            {item.severity !== "Saudável" && (
+                              <p className="mt-1 text-neutral-700">
+                                <GlossaryText text={item.detailTwo} />
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center justify-between text-[11px] text-neutral-600">
                             <span>{item.evidence}</span>
@@ -923,6 +952,13 @@ export function WatchlistPage() {
                           </div>
                         </div>
                       ))}
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                      <p className="text-xs font-medium text-neutral-900">Fechamento da sessão</p>
+                      <p className="mt-1 text-xs text-neutral-700">
+                        Nas próximas horas, acompanhe CSAN3 e MRVE3 para confirmar se a pressão em dívida e margens persiste.
+                      </p>
                     </div>
                   </section>
                 </div>
@@ -1067,17 +1103,20 @@ export function WatchlistPage() {
                     {filteredCompanies.map((company) => {
                       const isExpanded = expandedTicker === company.ticker;
                       const showDetails = listDensity === "Detalhado" || isExpanded;
+                      const isCompactCard = listDensity === "Compacto" && !isExpanded;
                       const scoreTotal = Math.round(
                         company.scores.reduce((sum, value) => sum + value, 0) / company.scores.length
                       );
                       const status = getStatusFromScores(company.scores);
+                      const minScore = Math.min(...company.scores);
+                      const minIndex = company.scores.findIndex((score) => score === minScore);
+                      const keyPillar = pillars[minIndex];
                       const freshnessBadge =
                         company.freshness === "Atual"
                           ? "Atualizado"
                           : company.freshness === "Falha"
-                            ? "Falha de dados"
+                            ? "Dados pendentes"
                             : "Sem dados";
-                      const attentionSummary = getAttentionSummary(company);
                       const whyItMatters = getWhyItMatters(company);
                       return (
                         <div
@@ -1091,9 +1130,11 @@ export function WatchlistPage() {
                               navigate(buildCompanyDeepLink(company.ticker, company.attentionPillar));
                             }
                           }}
-                          className={`bg-white rounded-2xl border border-neutral-200 border-l-4 shadow-sm p-3 cursor-pointer transition-colors ${clickableItemStyles[status]}`}
+                          className={`bg-white rounded-2xl border border-neutral-200 border-l-4 shadow-sm cursor-pointer transition-colors ${clickableItemStyles[status]} ${
+                            isCompactCard ? "p-2.5" : "p-3.5"
+                          }`}
                         >
-                          <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-start gap-3">
                                 <div className="h-9 w-9 rounded-full border border-neutral-200 bg-neutral-50 text-xs font-semibold text-neutral-600 flex items-center justify-center">
@@ -1104,28 +1145,30 @@ export function WatchlistPage() {
                                     {company.name} <span className="text-neutral-400">({company.ticker})</span>
                                   </p>
                                   <p className="text-xs text-neutral-500">{company.sector}</p>
-                                  <div className="mt-2 flex items-center gap-2">
+                                  <div className="mt-1.5 flex items-center gap-2">
                                     <span className={`px-2 py-1 rounded-full border text-[11px] font-medium ${badgeStyles[status]}`}>
                                       {status}
                                     </span>
-                                    <span
-                                      className={`px-2 py-1 rounded-full border text-[11px] font-medium ${freshnessBadgeStyles[freshnessBadge]}`}
-                                    >
-                                      {freshnessBadge}
-                                    </span>
                                   </div>
+                                  <p className="mt-1 text-sm font-medium text-neutral-900">
+                                    {minScore >= 70 ? "Sem pilar crítico no momento" : `${keyPillar} em atenção`}{" "}
+                                    <span className="text-neutral-500">({minScore}/100)</span>
+                                  </p>
                                 </div>
                               </div>
                             </div>
-                            <div className="text-xs text-neutral-600 whitespace-nowrap">Última mudança: {company.lastChangeDays}d</div>
                           </div>
 
-                          <div className="mt-3 flex items-start justify-between gap-4">
+                          <div className="mt-2.5 flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-sm text-neutral-800">{attentionSummary}</p>
-                              <p className="mt-1 text-xs text-neutral-600 truncate">{whyItMatters}</p>
+                              {!isCompactCard && <p className="text-xs text-neutral-600">{whyItMatters}</p>}
                               <p className="mt-1 text-[11px] text-neutral-500">
-                                Fonte: {sourceByTicker[company.ticker] ?? "CVM"} • Atualizado em {company.lastChangeDays}d
+                                Fonte: {sourceByTicker[company.ticker] ?? "CVM"} • Última mudança: {company.lastChangeDays}d
+                                <span
+                                  className={`ml-2 inline-flex px-1.5 py-0.5 rounded-full border text-[10px] font-medium align-middle ${freshnessBadgeStyles[freshnessBadge]}`}
+                                >
+                                  {freshnessBadge}
+                                </span>
                               </p>
                             </div>
                             <div className="relative flex items-center gap-1.5 flex-wrap justify-end">
@@ -1138,13 +1181,15 @@ export function WatchlistPage() {
                               >
                                 Ver detalhes
                               </button>
-                              <Link
-                                to={buildCompanyDeepLink(company.ticker, company.attentionPillar, defaultEvidenceByPillar[company.attentionPillar])}
-                                onClick={(event) => event.stopPropagation()}
-                                className="inline-flex items-center rounded-md border border-mint-200 bg-mint-50 px-2 py-1 text-xs font-medium text-mint-700 hover:text-neutral-900 whitespace-nowrap"
-                              >
-                                Ver evidência
-                              </Link>
+                              {!isCompactCard && (
+                                <Link
+                                  to={buildCompanyDeepLink(company.ticker, company.attentionPillar, defaultEvidenceByPillar[company.attentionPillar])}
+                                  onClick={(event) => event.stopPropagation()}
+                                  className="inline-flex items-center rounded-md border border-mint-200 bg-mint-50 px-2 py-1 text-xs font-medium text-mint-700 hover:text-neutral-900 whitespace-nowrap"
+                                >
+                                  Ver evidência
+                                </Link>
+                              )}
                               <button
                                 title={seenTickers.includes(company.ticker) ? "Marcar como não visto" : "Marcar visto"}
                                 onClick={(event) => {
@@ -1158,7 +1203,7 @@ export function WatchlistPage() {
                                 }`}
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5" />
-                                {seenTickers.includes(company.ticker) ? "Visto" : "Marcar visto"}
+                                {seenTickers.includes(company.ticker) ? "Visto" : isCompactCard ? "Marcar" : "Marcar visto"}
                               </button>
                               <button
                                 title="Mais ações"
@@ -1269,34 +1314,34 @@ export function WatchlistPage() {
               )}
             </section>
 
-            <aside className="lg:col-span-3 space-y-4">
+            <aside className="lg:col-span-3 space-y-3">
               <div className="lg:sticky lg:top-20 space-y-4">
-              <div className="bg-white rounded-2xl border border-neutral-200 p-2.5">
+              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-neutral-900">Resumo da Watchlist em 30s</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-600">Panorama rápido</h3>
                   <span className="text-[11px] text-neutral-400">Hoje</span>
                 </div>
                 <p className="text-[11px] text-neutral-700">
-                  Hoje sua watchlist está mais concentrada em sinais de atenção do que em sinais saudáveis.
+                  Hoje a watchlist segue mais carregada em atenção do que em estabilidade.
                 </p>
                 <div className="mt-1.5 grid grid-cols-3 gap-1 text-[11px] text-neutral-600">
                   <button
                     onClick={applySummaryAttentionFilter}
-                    className="rounded-md border border-neutral-200 bg-neutral-50 p-1 text-center hover:bg-neutral-100 transition-colors"
+                    className="rounded-md border border-neutral-200 bg-white p-1 text-center hover:bg-neutral-100 transition-colors"
                   >
                     <p className="text-sm font-semibold text-neutral-900">{summaryAttentionCount}</p>
                     <p>em atenção</p>
                   </button>
                   <button
                     onClick={applySummaryRiskFilter}
-                    className="rounded-md border border-neutral-200 bg-neutral-50 p-1 text-center hover:bg-neutral-100 transition-colors"
+                    className="rounded-md border border-neutral-200 bg-white p-1 text-center hover:bg-neutral-100 transition-colors"
                   >
                     <p className="text-sm font-semibold text-neutral-900">{summaryRiskCount}</p>
                     <p>em risco</p>
                   </button>
                   <button
                     onClick={applySummaryChangesWindow}
-                    className="rounded-md border border-neutral-200 bg-neutral-50 p-1 text-center hover:bg-neutral-100 transition-colors"
+                    className="rounded-md border border-neutral-200 bg-white p-1 text-center hover:bg-neutral-100 transition-colors"
                   >
                     <p className="text-sm font-semibold text-neutral-900">{summaryChanges30dCount}</p>
                     <p>mudanças 30d</p>
@@ -1304,7 +1349,7 @@ export function WatchlistPage() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-neutral-200 p-4">
+              <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3.5">
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-neutral-900">Alertas</h3>
                   <button
@@ -1336,34 +1381,6 @@ export function WatchlistPage() {
                   Configurar alertas
                 </button>
               </div>
-              </div>
-
-              <div className="rounded-2xl border border-neutral-200 bg-neutral-100/70 p-2">
-                <h3 className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">Adicionar empresas</h3>
-                <div className="relative mt-2">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                  <input
-                    type="text"
-                    placeholder="Buscar sugestões"
-                    className="w-full pl-10 pr-3 py-1.5 rounded-lg border border-neutral-200 bg-white text-[11px] text-neutral-700 focus:outline-none focus:ring-2 focus:ring-mint-100"
-                  />
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {suggestedCompanies.slice(0, 4).map((ticker) => (
-                    <button
-                      key={ticker}
-                      className="px-2 py-1 rounded-md border border-neutral-200 bg-white text-[10px] text-neutral-600 hover:bg-neutral-50"
-                    >
-                      {ticker}
-                    </button>
-                  ))}
-                </div>
-                <Link
-                  to="/explorar"
-                  className="mt-2 inline-flex w-full items-center justify-center px-3 py-1.5 rounded-md border border-neutral-200 bg-white text-[11px] font-medium text-neutral-600 hover:bg-neutral-100"
-                >
-                  Explorar mercado
-                </Link>
               </div>
             </aside>
           </div>

@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
   Bell,
@@ -353,6 +353,7 @@ function SegmentedHealthBar({ healthy, attention, risk }: { healthy: number; att
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [inboxError, setInboxError] = useState(false);
   const [inboxFilters, setInboxFilters] = useState<InboxFilters>(() => loadInboxFilters());
   const [inboxMode, setInboxMode] = useState<InboxMode>(() => loadInboxMode());
@@ -573,8 +574,7 @@ export function Dashboard() {
   const todayItems = useMemo(() => inboxItems.filter((item) => item.ageMinutes <= 24 * 60), [inboxItems]);
   const priorityItem = inboxRows[0];
   const leadingPillarMovement = [...pillarMovements].sort((a, b) => b.events - a.events)[0];
-  const visiblePillarMovements = [...pillarMovements].sort((a, b) => b.events - a.events).slice(0, 2);
-  const secondPillarMovement = [...pillarMovements].sort((a, b) => b.events - a.events)[1];
+  const visiblePillarMovements = [...pillarMovements].sort((a, b) => b.events - a.events).slice(0, 4);
 
   const todayRiskCount = todayItems.filter((item) => item.severity === "Risco").length;
   const todayAttentionCount = todayItems.filter((item) => item.severity === "Atenção").length;
@@ -594,12 +594,8 @@ export function Dashboard() {
   };
 
   const feedCtaLabel = (item: InboxItem, isPriority: boolean) => {
-    // Regra editorial:
-    // - visão da empresa: Ver análise completa
-    // - evento pontual (agenda/sinal futuro): Entender impacto
-    if (isPriority) return "Ver análise completa";
-    if (item.eventType === "evento_futuro") return "Entender impacto";
-    return "Ver análise completa";
+    if (isPriority || item.severity === "Risco") return "Ver análise completa";
+    return "Entender impacto";
   };
 
   const supportCards = [
@@ -608,11 +604,11 @@ export function Dashboard() {
       value: topRiskItem ? topRiskItem.ticker : "Sem risco novo",
       logoTicker: topRiskItem ? topRiskItem.ticker : null,
       subtitle: topRiskItem
-        ? "A alavancagem subiu alem do limite interno e virou o principal ponto de pressao do dia."
-        : "Nenhum sinal critico novo nas ultimas 24h.",
+        ? `${topRiskItem.title}`
+        : "Nenhum sinal crítico novo nas últimas 24h",
       delta: topRiskItem
-        ? `${pluralize(todayRiskCount, "sinal critico", "sinais criticos")} nas ultimas 24h`
-        : "Watchlist sem piora critica nova hoje",
+        ? `${pluralize(todayRiskCount, "sinal crítico", "sinais críticos")} nas últimas 24h`
+        : "Watchlist sem piora crítica nova hoje",
       ctaLabel: "Ver análise completa",
       action: () => (topRiskItem ? openInboxItem(topRiskItem) : focusInboxRecentImpact()),
       accent: "border-rose-200 bg-rose-50 text-rose-800",
@@ -622,10 +618,10 @@ export function Dashboard() {
       value: topImproveItem ? topImproveItem.ticker : "Sem melhora nova",
       logoTicker: topImproveItem ? topImproveItem.ticker : null,
       subtitle: topImproveItem
-        ? "O retorno segue estavel mesmo com ruido no dia e sustenta a leitura positiva do pilar."
-        : "Sem recuperacao relevante registrada hoje.",
+        ? `${topImproveItem.title}`
+        : "Sem recuperação relevante registrada hoje",
       delta: `${pluralize(todayHealthyCount, "sinal positivo", "sinais positivos")} relevantes hoje`,
-      ctaLabel: "Ver análise completa",
+      ctaLabel: "Entender impacto",
       action: () => (topImproveItem ? openInboxItem(topImproveItem) : focusInboxRecentImpact()),
       accent: "border-emerald-200 bg-emerald-50 text-emerald-800",
     },
@@ -633,51 +629,23 @@ export function Dashboard() {
       title: "Pilar mais movimentado",
       value: leadingPillarMovement.pillar,
       logoTicker: null,
-      subtitle: `${leadingPillarMovement.pillar} concentrou os principais sinais do dia e merece prioridade de leitura.`,
-      delta: `${leadingPillarMovement.events} eventos no dia`,
+      subtitle: `${leadingPillarMovement.pillar} concentrou a maior parte das mudanças do dia`,
+      delta: `${leadingPillarMovement.events} eventos · maioria em atenção`,
       ctaLabel: "Filtrar por pilar",
       action: () => applySinglePillarFilter(leadingPillarMovement.pillar),
       accent: "border-amber-200 bg-amber-50 text-amber-800",
     },
     {
       title: "Saúde da watchlist",
-      value: `${healthyWatchlistCount} de ${totalWatchlistCount} estáveis`,
+      value: `${healthyWatchlistCount} de ${totalWatchlistCount}`,
       logoTicker: null,
-      subtitle: "A maior parte da watchlist segue estável hoje, com pressão concentrada em poucos nomes.",
-      delta: `${healthyWatchlistCount} de ${totalWatchlistCount} sem sinais relevantes · +2,1 p.p. vs semana passada`,
-      ctaLabel: "Ver composição por grupo",
+      subtitle: "empresas seguem sem sinais relevantes hoje",
+      delta: "+2,1 p.p. vs semana passada",
+      ctaLabel: "Ver composição",
       action: () => navigate("/watchlist?filtro=saude"),
-      accent: "border-slate-300 bg-slate-50 text-slate-700",
+      accent: "border-[#D0D5DD] bg-[#F8FAFC] text-[#344054]",
     },
   ];
-
-  const feedSectionLabel = (item: InboxItem, index: number) => {
-    if (index === 0) return "Prioridade do dia";
-    if (item.severity === "Risco" || item.severity === "Atenção" || item.eventType === "evento_futuro") return "Acompanhamento relevante";
-    return "Estaveis e positivos";
-  };
-
-  const hasDominantPillar = leadingPillarMovement.events - (secondPillarMovement?.events ?? 0) >= 3;
-  const hasClearPriority = Boolean(priorityItem && priorityItem.impactScore >= 85);
-  const hasNearTermFollowUp = todayItems.some((item) => item.eventType === "evento_futuro");
-  const showSessionClosing = hasClearPriority || hasDominantPillar || hasNearTermFollowUp;
-
-  const impactedCompanies = useMemo(() => {
-    const scoreByTicker = new Map<string, { ticker: string; companyName: string; hits: number; maxImpact: number }>();
-    todayItems
-      .filter((item) => item.severity !== "Saudável" || item.pillarKey === leadingPillarMovement.pillar)
-      .forEach((item) => {
-        const prev = scoreByTicker.get(item.ticker);
-        if (!prev) {
-          scoreByTicker.set(item.ticker, { ticker: item.ticker, companyName: item.companyName, hits: 1, maxImpact: item.impactScore });
-          return;
-        }
-        prev.hits += 1;
-        prev.maxImpact = Math.max(prev.maxImpact, item.impactScore);
-      });
-
-    return [...scoreByTicker.values()].sort((a, b) => b.hits - a.hits || b.maxImpact - a.maxImpact).slice(0, 3);
-  }, [todayItems, leadingPillarMovement.pillar]);
 
   const activeFilterChips = [
     hasSeverityFilter ? activeSeverities : [],
@@ -690,23 +658,20 @@ export function Dashboard() {
   const orderLabel = inboxMode === "tempo-real" ? "tempo real" : "impacto";
 
   return (
-    <div
-      className={cn("min-h-screen", isDarkMode ? "bg-[#020617] text-[#E5E7EB]" : "bg-slate-50 text-slate-900")}
-      style={{ fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
-    >
+    <div className={cn("min-h-screen", isDarkMode ? "bg-[#020617] text-[#E5E7EB]" : "bg-[#F8FAFC] text-[#101828]")}>
       <div className="hidden md:fixed md:inset-y-0 md:left-0 md:z-30 md:block md:w-[88px]">
         <Sidebar currentPage="dashboard" />
       </div>
 
       <div className="md:pl-[88px]">
-        <header className={cn("sticky top-0 z-20 h-12 border-b", isDarkMode ? "border-[#1F2937] bg-[#0B1220]" : "border-slate-200 bg-white")}>
+        <header className={cn("sticky top-0 z-20 h-12 border-b", isDarkMode ? "border-[#1F2937] bg-[#0B1220]" : "border-[#EAECF0] bg-white")}>
           <div className="flex h-full items-center justify-between px-6">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <div className="md:hidden" />
-              <div className={cn("hidden h-8 w-full max-w-[430px] items-center rounded-lg border px-3 md:flex", isDarkMode ? "border-[#334155] bg-[#0F172A]" : "border-slate-200 bg-slate-50")}>
-                <Search className={cn("h-4 w-4", isDarkMode ? "text-slate-400" : "text-slate-400")} />
+              <div className={cn("hidden h-8 w-full max-w-[430px] items-center rounded-lg border px-3 md:flex", isDarkMode ? "border-[#334155] bg-[#0F172A]" : "border-[#E4E7EC] bg-[#FCFCFD]")}>
+                <Search className={cn("h-4 w-4", isDarkMode ? "text-[#9CA3AF]" : "text-[#98A2B3]")} />
                 <Input
-                  className={cn("h-7 border-0 bg-transparent px-2 text-[13px] shadow-none ring-0 focus-visible:ring-0", isDarkMode ? "text-[#E5E7EB] placeholder:text-slate-400" : "")}
+                  className={cn("h-7 border-0 bg-transparent px-2 text-[13px] shadow-none ring-0 focus-visible:ring-0", isDarkMode ? "text-[#E5E7EB] placeholder:text-[#9CA3AF]" : "")}
                   placeholder="Busque empresa ou ticker..."
                 />
               </div>
@@ -714,11 +679,11 @@ export function Dashboard() {
 
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full">
-                <Bell className={cn("h-[30px] w-[30px]", isDarkMode ? "text-slate-400" : "text-slate-500")} />
+                <Bell className={cn("h-[30px] w-[30px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")} />
                 <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#DC2626]" />
               </Button>
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                <Settings className={cn("h-[30px] w-[30px]", isDarkMode ? "text-slate-400" : "text-slate-500")} />
+                <Settings className={cn("h-[30px] w-[30px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")} />
               </Button>
               <Button
                 variant="ghost"
@@ -728,10 +693,10 @@ export function Dashboard() {
                 aria-label={isDarkMode ? "Ativar modo claro" : "Ativar modo escuro"}
                 title={isDarkMode ? "Modo claro" : "Modo escuro"}
               >
-                {isDarkMode ? <Sun className="h-5 w-5 text-[#FBBF24]" /> : <Moon className="h-5 w-5 text-slate-500" />}
+                {isDarkMode ? <Sun className="h-5 w-5 text-[#FBBF24]" /> : <Moon className="h-5 w-5 text-[#667085]" />}
               </Button>
               <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                <UserCircle2 className={cn("h-5 w-5", isDarkMode ? "text-slate-400" : "text-slate-500")} />
+                <UserCircle2 className={cn("h-5 w-5", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")} />
               </Button>
             </div>
           </div>
@@ -741,16 +706,16 @@ export function Dashboard() {
           <section className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
-                <h1 className={cn("text-[24px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-slate-900")}>Sua watchlist hoje</h1>
-                <span className={cn("rounded-full border px-2.5 py-1 text-[12px]", isDarkMode ? "border-[#374151] bg-[#111827] text-slate-400" : "border-slate-200 bg-white text-slate-500")}>Atualizado {refreshLabel}</span>
+                <h1 className={cn("text-[24px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>Sua watchlist hoje</h1>
+                <span className={cn("rounded-full border px-2.5 py-1 text-[12px]", isDarkMode ? "border-[#374151] bg-[#111827] text-[#9CA3AF]" : "border-[#EAECF0] bg-white text-[#667085]")}>Atualizado {refreshLabel}</span>
               </div>
-              <p className={cn("text-[13px]", isDarkMode ? "text-slate-400" : "text-slate-500")}>Leitura das últimas 24h</p>
+              <p className={cn("text-[13px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>Leitura das últimas 24h</p>
             </div>
             <Button
               variant="outline"
               className={cn(
                 "h-8 rounded-lg border px-3 text-[12px] font-medium",
-                isDarkMode ? "border-[#334155] bg-[#0F172A] text-slate-400 hover:bg-[#1F2937]" : "border-slate-300 bg-slate-50 text-slate-600 hover:bg-white",
+                isDarkMode ? "border-[#334155] bg-[#0F172A] text-[#9CA3AF] hover:bg-[#1F2937]" : "border-[#D0D5DD] bg-[#FCFCFD] text-[#475467] hover:bg-white",
               )}
             >
               + Criar alerta
@@ -758,23 +723,23 @@ export function Dashboard() {
           </section>
 
           <section>
-            <Card className={cn("rounded-2xl border", isDarkMode ? "border-[#134E48] bg-[#0B2A2A]" : "border-mint-200 bg-gradient-to-r from-[#ECFDF9] to-white")}>
+            <Card className={cn("rounded-2xl border", isDarkMode ? "border-[#134E48] bg-[#0B2A2A]" : "border-[#BFEAE4] bg-gradient-to-r from-[#ECFDF9] to-white")}>
               <CardContent className="space-y-3 p-4">
                 <div className="space-y-1.5">
-                  <p className={cn("text-[12px] font-semibold uppercase tracking-[0.08em]", isDarkMode ? "text-[#5EEAD4]" : "text-mint-600")}>Resumo do dia</p>
-                  <p className={cn("text-[20px] font-semibold leading-tight", isDarkMode ? "text-[#F3F4F6]" : "text-slate-900")}>
+                  <p className={cn("text-[12px] font-semibold uppercase tracking-[0.08em]", isDarkMode ? "text-[#5EEAD4]" : "text-[#0E9384]")}>Resumo do dia</p>
+                  <p className={cn("text-[20px] font-semibold leading-tight", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>
                     {todayRiskCount > 0 || todayAttentionCount > 0
                       ? `Hoje sua watchlist teve ${pluralize(todayRiskCount, "mudança de risco", "mudanças de risco")} e ${pluralize(todayHealthyCount, "melhora importante", "melhoras importantes")}.`
                       : "Sua watchlist está estável hoje, sem pioras críticas novas."}
                   </p>
-                  <p className={cn("text-[14px]", isDarkMode ? "text-[#C5D4D4]" : "text-slate-600")}>
+                  <p className={cn("text-[14px]", isDarkMode ? "text-[#C5D4D4]" : "text-[#475467]")}>
                     {priorityItem
-                      ? `${priorityItem.ticker} concentrou a principal mudança de contexto, enquanto ${leadingPillarMovement.pillar} liderou o volume de sinais do dia.`
-                      : "O dia segue estável, com poucas mudanças materiais no contexto da watchlist."}
+                      ? `Comece por ${priorityItem.ticker}: ${priorityItem.title.toLowerCase()}. Pilar mais pressionado: ${leadingPillarMovement.pillar}.`
+                      : "Comece pelas atualizações mais recentes para confirmar se houve mudanças de contexto."}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button onClick={focusInboxRecentImpact} className="h-9 rounded-lg bg-mint-600 px-3 text-[12px] font-semibold text-white hover:bg-mint-700">
+                  <Button onClick={focusInboxRecentImpact} className="h-9 rounded-lg bg-[#0E9384] px-3 text-[12px] font-semibold text-white hover:bg-[#0B7F74]">
                     Ver prioridades do dia
                   </Button>
                   <Button
@@ -782,7 +747,7 @@ export function Dashboard() {
                     onClick={focusInboxRecentImpact}
                     className={cn(
                       "h-9 rounded-lg border px-3 text-[12px] font-semibold",
-                      isDarkMode ? "border-[#2DD4BF]/40 bg-transparent text-[#CCFBF1] hover:bg-[#0F3A39]" : "border-mint-200 bg-white text-mint-600 hover:bg-mint-50",
+                      isDarkMode ? "border-[#2DD4BF]/40 bg-transparent text-[#CCFBF1] hover:bg-[#0F3A39]" : "border-[#99DFD7] bg-white text-[#0E9384] hover:bg-[#F0FDFA]",
                     )}
                   >
                     Ver atualizações
@@ -790,7 +755,7 @@ export function Dashboard() {
                   <span
                     className={cn(
                       "inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px]",
-                      isDarkMode ? "border-[#334155] bg-[#0F172A] text-slate-400" : "border-slate-300 bg-white text-slate-500",
+                      isDarkMode ? "border-[#334155] bg-[#0F172A] text-[#9CA3AF]" : "border-[#D0D5DD] bg-white text-[#667085]",
                     )}
                   >
                     <Database className="h-3 w-3" />
@@ -801,44 +766,55 @@ export function Dashboard() {
             </Card>
           </section>
 
-          <section>
-            <Card className={cn("rounded-2xl border", isDarkMode ? "border-[#1F2937] bg-[#0B1220]" : "border-slate-200 bg-white")}>
-              <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-                <div className="space-y-1">
-                  <p className={cn("text-[12px] font-semibold uppercase tracking-[0.08em]", isDarkMode ? "text-[#5EEAD4]" : "text-mint-600")}>Proximo passo</p>
-                  <p className={cn("text-[15px] font-semibold leading-snug", isDarkMode ? "text-[#F3F4F6]" : "text-slate-900")}>
-                    {priorityItem
-                      ? `Abra ${priorityItem.ticker}, valide o impacto e avance para os itens de acompanhamento relevante.`
-                      : "Revise os itens de maior impacto e confirme se o contexto da watchlist se mantém estável."}
-                  </p>
-                  <p className={cn("text-[12px]", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                    Siga nesta ordem: prioridade do dia, depois acompanhamento relevante e, por fim, itens estaveis.
-                  </p>
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {supportCards.map((card) => (
+              <button
+                key={card.title}
+                onClick={card.action}
+                className={cn(
+                  "group rounded-2xl border p-3.5 text-left transition-all duration-150",
+                  isDarkMode
+                    ? "border-[#1F2937] bg-[#0F172A] hover:border-[#334155] hover:shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
+                    : "border-[#EAECF0] bg-white hover:border-[#D0D5DD] hover:shadow-[0_2px_10px_rgba(16,24,40,0.06)]",
+                )}
+              >
+                <p className={cn("mb-2 text-[12px] font-medium", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>{card.title}</p>
+                <div className="flex items-center gap-2">
+                  {card.logoTicker && logoByTicker[card.logoTicker] ? (
+                    <Avatar className="h-7 w-7 rounded-md">
+                      <AvatarImage src={logoByTicker[card.logoTicker]} alt={card.logoTicker} className="object-cover" />
+                      <AvatarFallback className="rounded-md text-[10px]">{card.logoTicker.slice(0, 2)}</AvatarFallback>
+                    </Avatar>
+                  ) : null}
+                  <p className={cn("text-[17px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>{card.value}</p>
                 </div>
-                <Button onClick={focusInboxRecentImpact} className="h-9 rounded-lg bg-mint-600 px-3 text-[12px] font-semibold text-white hover:bg-mint-700">
-                  Abrir prioridade 1 do dia
-                </Button>
-              </CardContent>
-            </Card>
+                <p className={cn("mt-1.5 text-[12px] leading-snug", isDarkMode ? "text-[#CBD5E1]" : "text-[#344054]")}>{card.subtitle}</p>
+                <p className={cn("mt-2.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium", card.accent)}>{card.delta}</p>
+                <div className="mt-2.5 flex items-center justify-between">
+                  <span className="text-[12px] font-semibold text-[#0E9384]">{card.ctaLabel}</span>
+                  <ChevronRight className={cn("h-4 w-4", isDarkMode ? "text-[#94A3B8]" : "text-[#98A2B3]")} />
+                </div>
+              </button>
+            ))}
           </section>
 
-          <section ref={inboxRef} className="grid items-start gap-4 xl:grid-cols-3">
-            <Card className={cn("rounded-2xl border xl:col-span-2", isDarkMode ? "border-[#1F2937] bg-[#0F172A]" : "border-slate-200 bg-white")}>
+          <section ref={inboxRef} className="grid gap-4 xl:grid-cols-3">
+            <Card className={cn("rounded-2xl border xl:col-span-2", isDarkMode ? "border-[#1F2937] bg-[#0F172A]" : "border-[#EAECF0] bg-white")}>
               <CardHeader className="space-y-3 px-4 pt-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <CardTitle className={cn("text-[16px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-slate-900")}>Atualizações da watchlist</CardTitle>
-                    <CardDescription className={cn("text-[14px]", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                      Fluxo guiado: priorize o primeiro item, avance no acompanhamento relevante e finalize nos estaveis.
+                    <CardTitle className={cn("text-[16px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>Atualizações da watchlist</CardTitle>
+                    <CardDescription className={cn("text-[14px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>
+                      Comece pelas mudanças com maior impacto e entenda por que elas importam.
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className={cn("inline-flex rounded-lg border p-0.5", isDarkMode ? "border-[#374151] bg-[#0F172A]" : "border-slate-300 bg-white")}>
+                    <div className={cn("inline-flex rounded-lg border p-0.5", isDarkMode ? "border-[#374151] bg-[#0F172A]" : "border-[#D0D5DD] bg-white")}>
                       <button
                         onClick={setImpactMode}
                         className={cn(
                           "rounded-md px-2.5 py-1.5 text-[12px] font-semibold transition",
-                          inboxMode === "top-impacto" ? "bg-mint-600 text-white" : isDarkMode ? "text-slate-400 hover:bg-[#1F2937]" : "text-slate-500 hover:bg-slate-100",
+                          inboxMode === "top-impacto" ? "bg-[#0E9384] text-white" : isDarkMode ? "text-[#9CA3AF] hover:bg-[#1F2937]" : "text-[#667085] hover:bg-[#F2F4F7]",
                         )}
                       >
                         Top impacto
@@ -847,7 +823,7 @@ export function Dashboard() {
                         onClick={setRealTimeMode}
                         className={cn(
                           "rounded-md px-2.5 py-1.5 text-[12px] font-semibold transition",
-                          inboxMode === "tempo-real" ? "bg-mint-600 text-white" : isDarkMode ? "text-slate-400 hover:bg-[#1F2937]" : "text-slate-500 hover:bg-slate-100",
+                          inboxMode === "tempo-real" ? "bg-[#0E9384] text-white" : isDarkMode ? "text-[#9CA3AF] hover:bg-[#1F2937]" : "text-[#667085] hover:bg-[#F2F4F7]",
                         )}
                       >
                         Tempo real
@@ -856,9 +832,9 @@ export function Dashboard() {
                   </div>
                 </div>
 
-                <div className={cn("rounded-xl border p-3", isDarkMode ? "border-[#1F2937] bg-[#111827]" : "border-slate-200 bg-slate-50")}>
+                <div className={cn("rounded-xl border p-3", isDarkMode ? "border-[#1F2937] bg-[#111827]" : "border-[#EAECF0] bg-[#FCFCFD]")}>
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className={cn("text-[12px] font-medium", isDarkMode ? "text-slate-400" : "text-slate-500")}>Período</p>
+                    <p className={cn("text-[12px] font-medium", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>Período</p>
                     {(["24h", "7d", "30d"] as WindowRange[]).map((range) => (
                       <button
                         key={range}
@@ -866,10 +842,10 @@ export function Dashboard() {
                         className={cn(
                           "h-7 rounded-full border px-3 text-[11px] font-medium",
                           inboxFilters.period === range
-                            ? "border-[#0E9384] bg-mint-600 text-white"
+                            ? "border-[#0E9384] bg-[#0E9384] text-white"
                             : isDarkMode
-                              ? "border-[#374151] bg-[#0F172A] text-slate-400 hover:bg-[#1F2937]"
-                              : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
+                              ? "border-[#374151] bg-[#0F172A] text-[#9CA3AF] hover:bg-[#1F2937]"
+                              : "border-[#EAECF0] bg-white text-[#667085] hover:bg-[#F9FAFB]",
                         )}
                       >
                         {range}
@@ -879,7 +855,7 @@ export function Dashboard() {
                       onClick={() => setFiltersOpen((prev) => !prev)}
                       className={cn(
                         "ml-auto rounded-lg border px-3 py-1.5 text-[12px] font-medium",
-                        isDarkMode ? "border-[#374151] bg-[#0F172A] text-[#D1D5DB] hover:bg-[#1F2937]" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
+                        isDarkMode ? "border-[#374151] bg-[#0F172A] text-[#D1D5DB] hover:bg-[#1F2937]" : "border-[#D0D5DD] bg-white text-[#475467] hover:bg-[#F9FAFB]",
                       )}
                     >
                       {showFiltersCount ? `Filtros (${advancedFiltersCount})` : "Filtros"}
@@ -887,12 +863,12 @@ export function Dashboard() {
                   </div>
 
                   <div className="mt-2 flex items-center justify-between gap-2 text-[12px]">
-                    <p className={cn(isDarkMode ? "text-slate-400" : "text-slate-500")}>
+                    <p className={cn(isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>
                       {inboxRows.length} atualizações · ordenado por {orderLabel}
                     </p>
-                    <div className={cn("flex items-center gap-2", isDarkMode ? "text-slate-400" : "text-slate-500")}>
+                    <div className={cn("flex items-center gap-2", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>
                       <span>Atualizado {refreshLabel}</span>
-                      <button onClick={refreshInboxNow} className="font-semibold text-mint-600 hover:text-mint-700" disabled={isRefreshing}>
+                      <button onClick={refreshInboxNow} className="font-semibold text-[#0E9384] hover:text-[#0B7F74]" disabled={isRefreshing}>
                         {isRefreshing ? "Atualizando..." : "Atualizar agora"}
                       </button>
                     </div>
@@ -901,9 +877,9 @@ export function Dashboard() {
                   {refreshError && <p className="mt-2 text-[12px] font-medium text-[#B42318]">{refreshError}</p>}
 
                   {filtersOpen && (
-                    <div className={cn("mt-3 space-y-2 rounded-lg border p-3", isDarkMode ? "border-[#374151] bg-[#0F172A]" : "border-slate-200 bg-white")}>
+                    <div className="mt-3 space-y-2 rounded-lg border border-[#EAECF0] bg-white p-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[12px] font-medium text-slate-500">Severidade</p>
+                        <p className="text-[12px] font-medium text-[#667085]">Severidade</p>
                         {allStatuses.map((status) => (
                           <button
                             key={status}
@@ -911,8 +887,8 @@ export function Dashboard() {
                             className={cn(
                               "h-7 rounded-full border px-3 text-[11px] font-medium",
                               activeSeverities.includes(status)
-                                ? "border-[#0E9384] bg-mint-50 text-mint-600"
-                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
+                                ? "border-[#0E9384] bg-[#E6FFFB] text-[#0E9384]"
+                                : "border-[#EAECF0] bg-white text-[#667085] hover:bg-[#F9FAFB]",
                             )}
                           >
                             {status}
@@ -921,7 +897,7 @@ export function Dashboard() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[12px] font-medium text-slate-500">Pilar</p>
+                        <p className="text-[12px] font-medium text-[#667085]">Pilar</p>
                         {allPillars.map((pillar) => (
                           <button
                             key={pillar}
@@ -929,8 +905,8 @@ export function Dashboard() {
                             className={cn(
                               "h-7 rounded-full border px-3 text-[11px] font-medium",
                               activePillars.includes(pillar)
-                                ? "border-[#0E9384] bg-mint-50 text-mint-600"
-                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
+                                ? "border-[#0E9384] bg-[#E6FFFB] text-[#0E9384]"
+                                : "border-[#EAECF0] bg-white text-[#667085] hover:bg-[#F9FAFB]",
                             )}
                           >
                             {pillar}
@@ -939,7 +915,7 @@ export function Dashboard() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[12px] font-medium text-slate-500">Fonte</p>
+                        <p className="text-[12px] font-medium text-[#667085]">Fonte</p>
                         {allSources.map((source) => (
                           <button
                             key={source}
@@ -947,8 +923,8 @@ export function Dashboard() {
                             className={cn(
                               "h-7 rounded-full border px-3 text-[11px] font-medium",
                               activeSources.includes(source)
-                                ? "border-[#0E9384] bg-mint-50 text-mint-600"
-                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
+                                ? "border-[#0E9384] bg-[#E6FFFB] text-[#0E9384]"
+                                : "border-[#EAECF0] bg-white text-[#667085] hover:bg-[#F9FAFB]",
                             )}
                           >
                             {source}
@@ -957,7 +933,7 @@ export function Dashboard() {
                       </div>
 
                       <div className="flex justify-end">
-                        <button onClick={clearInboxFilters} className="text-[12px] font-semibold text-mint-600 hover:text-mint-700">
+                        <button onClick={clearInboxFilters} className="text-[12px] font-semibold text-[#0E9384] hover:text-[#0B7F74]">
                           Limpar
                         </button>
                       </div>
@@ -968,14 +944,14 @@ export function Dashboard() {
 
               <CardContent className="space-y-2 px-4 pb-4">
                 {hasAnyFilterOverride && (
-                  <div className={cn("rounded-xl border px-3 py-2", isDarkMode ? "border-[#374151] bg-[#111827]" : "border-slate-200 bg-slate-50")}>
+                  <div className={cn("rounded-xl border px-3 py-2", isDarkMode ? "border-[#374151] bg-[#111827]" : "border-[#E4E7EC] bg-[#F8FAFC]")}>
                     <div className="flex flex-wrap items-center gap-2">
                       {activeFilterChips.map((chip) => (
-                        <span key={chip} className={cn("inline-flex h-[22px] items-center rounded-full border px-2 text-[11px]", isDarkMode ? "border-[#475467] bg-[#0F172A] text-[#CBD5E1]" : "border-slate-200 bg-white text-slate-600")}>
+                        <span key={chip} className={cn("inline-flex h-[22px] items-center rounded-full border px-2 text-[11px]", isDarkMode ? "border-[#475467] bg-[#0F172A] text-[#CBD5E1]" : "border-[#E4E7EC] bg-white text-[#475467]")}>
                           {chip}
                         </span>
                       ))}
-                      <button onClick={clearInboxFilters} className="ml-auto text-[12px] font-semibold text-mint-600 hover:text-mint-700">
+                      <button onClick={clearInboxFilters} className="ml-auto text-[12px] font-semibold text-[#0E9384] hover:text-[#0B7F74]">
                         Limpar filtros
                       </button>
                     </div>
@@ -985,7 +961,7 @@ export function Dashboard() {
                 {isLoading ? (
                   <div className="space-y-2">
                     {[1, 2, 3, 4].map((item) => (
-                      <div key={item} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-slate-50" />
+                      <div key={item} className="h-16 animate-pulse rounded-xl border border-[#EAECF0] bg-[#F8FAFC]" />
                     ))}
                   </div>
                 ) : inboxError ? (
@@ -996,11 +972,11 @@ export function Dashboard() {
                     </button>
                   </div>
                 ) : inboxRows.length === 0 ? (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4">
-                    <p className="text-[14px] text-slate-500">Nenhuma atualização relevante no período.</p>
+                  <div className="rounded-xl border border-[#EAECF0] bg-[#F8FAFC] px-3 py-4">
+                    <p className="text-[14px] text-[#667085]">Nenhuma atualização relevante no período.</p>
                     <button
                       onClick={() => setInboxFilters((prev) => ({ ...prev, period: "7d" }))}
-                      className="mt-2 text-[12px] font-medium text-mint-600 hover:text-mint-700"
+                      className="mt-2 text-[12px] font-medium text-[#0E9384] hover:text-[#0B7F74]"
                     >
                       Ampliar para 7 dias
                     </button>
@@ -1008,8 +984,8 @@ export function Dashboard() {
                 ) : (
                   <>
                     {inboxMode === "top-impacto" && priorityItem && (
-                      <div className={cn("rounded-xl border px-3 py-2", isDarkMode ? "border-[#134E48] bg-[#0F2B2A]" : "border-mint-200 bg-mint-50")}>
-                        <p className={cn("text-[12px] font-semibold", isDarkMode ? "text-[#99F6E4]" : "text-mint-600")}>
+                      <div className={cn("rounded-xl border px-3 py-2", isDarkMode ? "border-[#134E48] bg-[#0F2B2A]" : "border-[#99DFD7] bg-[#F0FDFA]")}>
+                        <p className={cn("text-[12px] font-semibold", isDarkMode ? "text-[#99F6E4]" : "text-[#0E9384]")}>
                           Maior impacto hoje: {priorityItem.ticker}
                           {priorityItem.pillarKey ? ` em ${priorityItem.pillarKey}` : ""}
                         </p>
@@ -1018,55 +994,45 @@ export function Dashboard() {
                     {inboxRows.map((item, index) => {
                       const isNew = (newBadgeUntil[item.id] ?? 0) > Date.now();
                       const isPriority = index === 0 && inboxMode === "top-impacto";
-                      const sectionLabel = feedSectionLabel(item, index);
-                      const isStablePositive = sectionLabel === "Estaveis e positivos";
                       return (
                         <button
                           key={item.id}
                         onClick={() => openInboxItem(item)}
                         className={cn(
-                          "w-full cursor-default rounded-xl border border-transparent text-left transition hover:border-slate-300 hover:bg-slate-100 hover:shadow-[inset_3px_0_0_#0E9384]",
-                          isStablePositive ? "p-1.5" : "p-3",
-                          isNew && (isDarkMode ? "border-[#1D4ED8] bg-[#0F172A]" : "border-[#B2DDFF] bg-[#F0F9FF]"),
-                          isPriority && (isDarkMode ? "border-mint-500/40 bg-[#0F2B2A] hover:bg-[#0F3A39] hover:border-mint-500/60" : "border-mint-200 bg-mint-50 hover:bg-[#ECFDF9] hover:border-[#6ED4C7]"),
+                          "w-full cursor-pointer rounded-xl border border-transparent p-3 text-left transition hover:border-[#D0D5DD] hover:bg-[#F2F4F7] hover:shadow-[inset_3px_0_0_#0E9384]",
+                          isNew && "border-[#B2DDFF] bg-[#F0F9FF]",
+                          isPriority && "border-[#99DFD7] bg-[#F0FDFA] hover:bg-[#ECFDF9] hover:border-[#6ED4C7]",
                         )}
                       >
-                        <div className={cn("flex items-start justify-between", isStablePositive ? "gap-1" : "gap-3")}>
-                            <div className={cn("flex min-w-0 flex-1 items-start", isStablePositive ? "gap-1.5" : "gap-2.5")}>
-                              <Avatar className={cn("rounded-md", isStablePositive ? "h-6 w-6" : "h-8 w-8")}>
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                              <Avatar className="h-8 w-8 rounded-md">
                                 <AvatarImage src={logoByTicker[item.ticker]} alt={item.ticker} className="object-cover" />
                                 <AvatarFallback className="rounded-md text-[10px]">{item.ticker.slice(0, 2)}</AvatarFallback>
                               </Avatar>
                               <div className="min-w-0">
                                 {isPriority && (
-                                  <span className={cn("mb-1 inline-flex h-[22px] items-center rounded-full border px-2 text-[11px] font-semibold", isDarkMode ? "border-[#2DD4BF]/40 bg-[#134E48] text-[#CCFBF1]" : "border-mint-200 bg-mint-50 text-mint-600")}>
+                                  <span className={cn("mb-1 inline-flex h-[22px] items-center rounded-full border px-2 text-[11px] font-semibold", isDarkMode ? "border-[#2DD4BF]/40 bg-[#134E48] text-[#CCFBF1]" : "border-[#99DFD7] bg-[#E6FFFB] text-[#0E9384]")}>
                                     Prioridade 1
                                   </span>
                                 )}
-                                {!isPriority && !isStablePositive && (
-                                  <span className={cn("mb-1 inline-flex h-[20px] items-center rounded-full border px-2 text-[10px] font-semibold uppercase tracking-[0.04em]", isDarkMode ? "border-[#334155] bg-[#111827] text-slate-300" : "border-slate-200 bg-slate-50 text-slate-600")}>
-                                    {sectionLabel}
-                                  </span>
-                                )}
-                                <p className={cn("truncate font-semibold", isStablePositive ? "text-[12px]" : "text-[13px]", isDarkMode ? "text-slate-300" : "text-slate-700")}>
-                                  {isStablePositive ? item.ticker : `${item.ticker} · ${item.companyName}`}
+                                <p className="truncate text-[13px] font-semibold text-[#344054]">
+                                  {item.ticker} · {item.companyName}
                                 </p>
-                                <p className={cn(isStablePositive ? "text-[12px]" : "text-[14px]", "truncate font-semibold", isDarkMode ? "text-slate-100" : "text-slate-900")}>{item.title}</p>
-                                {!isStablePositive && (
-                                  <p className={cn("mt-1 line-clamp-1 text-[12px]", isDarkMode ? "text-slate-400" : "text-slate-600")}>Por que isso importa: {item.whyItMatters}</p>
-                                )}
-                                <div className={cn("flex flex-wrap gap-1", isStablePositive ? "mt-0" : "mt-1")}>
+                                <p className="truncate text-[14px] font-semibold text-[#101828]">{item.title}</p>
+                                <p className="mt-1 line-clamp-1 text-[12px] text-[#475467]">Por que isso importa: {item.whyItMatters}</p>
+                                <div className="mt-1 flex flex-wrap gap-1">
                                   {item.pillarKey && (
-                                    <span className={cn("inline-flex h-[22px] items-center rounded-full border px-2 text-[11px]", isDarkMode ? "border-[#374151] bg-[#111827] text-slate-300" : "border-slate-200 bg-slate-50 text-slate-600")}>
+                                    <span className="inline-flex h-[22px] items-center rounded-full border border-[#E4E7EC] bg-[#F9FAFB] px-2 text-[11px] text-[#475467]">
                                       {item.pillarKey}
                                     </span>
                                   )}
                                   {item.source && (
-                                    <span className={cn("inline-flex h-[22px] items-center rounded-full border px-2 text-[11px]", isDarkMode ? "border-[#374151] bg-[#111827] text-slate-300" : "border-slate-200 bg-slate-50 text-slate-600")}>
+                                    <span className="inline-flex h-[22px] items-center rounded-full border border-[#E4E7EC] bg-[#F9FAFB] px-2 text-[11px] text-[#475467]">
                                       {item.source}
                                     </span>
                                   )}
-                                  <span className={cn("inline-flex h-[22px] items-center rounded-full border px-2 text-[11px]", isDarkMode ? "border-[#374151] bg-[#111827] text-slate-300" : "border-slate-200 bg-slate-50 text-slate-600")}>
+                                  <span className="inline-flex h-[22px] items-center rounded-full border border-[#E4E7EC] bg-[#F9FAFB] px-2 text-[11px] text-[#475467]">
                                     {item.relativeTime}
                                   </span>
                                   {isNew && <span className="inline-flex h-[22px] items-center rounded-full border border-sky-300 bg-sky-100 px-2 text-[11px] font-semibold text-sky-900">Novo</span>}
@@ -1074,11 +1040,11 @@ export function Dashboard() {
                               </div>
                             </div>
 
-                            <div className="flex shrink-0 flex-col items-end gap-1.5">
-                              {!isStablePositive && <StatusBadge status={item.severity} />}
+                            <div className="flex shrink-0 flex-col items-end gap-2">
+                              <StatusBadge status={item.severity} />
                               <div className="flex items-center gap-1.5">
-                                <span className={cn("font-semibold text-mint-600", isStablePositive ? "text-[11px]" : "text-[12px]")}>{feedCtaLabel(item, isPriority)}</span>
-                                <ChevronRight className={cn("h-4 w-4", isDarkMode ? "text-slate-500" : "text-slate-400")} />
+                                <span className="text-[12px] font-semibold text-[#0E9384]">{feedCtaLabel(item, isPriority)}</span>
+                                <ChevronRight className="h-4 w-4 text-[#98A2B3]" />
                               </div>
                             </div>
                           </div>
@@ -1090,19 +1056,19 @@ export function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className={cn("rounded-2xl border", isDarkMode ? "border-[#1F2937] bg-[#0F172A]" : "border-slate-200 bg-white")}>
+            <Card className={cn("rounded-2xl border", isDarkMode ? "border-[#1F2937] bg-[#0F172A]" : "border-[#EAECF0] bg-white")}>
               <CardHeader className="px-4 pt-4">
-                <CardTitle className={cn("text-[16px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-slate-900")}>Pilares em movimento</CardTitle>
-                <CardDescription className={cn("text-[14px]", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                  Atalho de exploracao: use apos revisar a prioridade e o feed principal.
+                <CardTitle className={cn("text-[16px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-[#101828]")}>Pilares em movimento</CardTitle>
+                <CardDescription className={cn("text-[14px]", isDarkMode ? "text-[#9CA3AF]" : "text-[#667085]")}>
+                  Veja quais temas concentraram mudanças hoje e clique para filtrar a inbox.
                 </CardDescription>
               </CardHeader>
 
-              <CardContent className="space-y-0.5 px-4">
+              <CardContent className="space-y-1 px-4">
                 {isLoading ? (
                   <div className="space-y-2">
                     {[1, 2, 3, 4, 5].map((item) => (
-                      <div key={item} className="h-12 animate-pulse rounded-xl border border-slate-200 bg-slate-50" />
+                      <div key={item} className="h-12 animate-pulse rounded-xl border border-[#EAECF0] bg-[#F8FAFC]" />
                     ))}
                   </div>
                 ) : (
@@ -1111,121 +1077,42 @@ export function Dashboard() {
                       key={item.pillar}
                       onClick={() => applySinglePillarFilter(item.pillar)}
                       className={cn(
-                        "w-full cursor-default rounded-xl border border-transparent p-2 text-left transition hover:border-slate-300 hover:bg-slate-50",
+                        "w-full cursor-pointer rounded-xl border border-transparent p-2.5 text-left transition hover:border-[#D0D5DD] hover:bg-[#F8FAFC]",
                         idx > 0 && "border-t border-t-[#F2F4F7]",
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-[14px] font-medium text-slate-900">{item.pillar}</p>
-                          <p className="mt-0.5 text-[11px] text-slate-600">{item.pillar} {pillarInsight[item.pillar]}.</p>
+                          <p className="text-[14px] font-medium text-[#101828]">{item.pillar}</p>
+                          <p className="mt-0.5 text-[12px] text-[#475467]">{item.pillar} {pillarInsight[item.pillar]}.</p>
                           <div className="mt-1.5">
                             <SegmentedHealthBar healthy={item.healthy} attention={item.attention} risk={item.risk} />
                             <div className="mt-1 flex flex-wrap items-center gap-3 text-[10px]">
-                              <span className="text-slate-500">{item.events} eventos</span>
+                              <span className="text-[#667085]">{item.events} eventos</span>
                               <span className="text-rose-600">Risco {item.risk}</span>
                               <span className="text-amber-600">Atenção {item.attention}</span>
                               <span className="text-emerald-600">Saudável {item.healthy}</span>
                             </div>
                           </div>
                         </div>
-                        <ChevronRight className={cn("h-4 w-4", isDarkMode ? "text-slate-500" : "text-slate-400")} />
+                        <ChevronRight className="h-4 w-4 text-[#98A2B3]" />
                       </div>
                     </button>
                   ))
                 )}
               </CardContent>
 
-              <CardFooter className="block space-y-3 border-t border-[#F2F4F7] px-4 pt-3 pb-3.5">
-                {impactedCompanies.length > 0 && (
-                  <div className={cn("rounded-xl border p-2.5", isDarkMode ? "border-[#1F2937] bg-[#111827]" : "border-slate-200 bg-slate-50")}>
-                    <p className={cn("text-[11px] font-semibold uppercase tracking-[0.06em]", isDarkMode ? "text-slate-300" : "text-slate-600")}>Empresas mais afetadas</p>
-                    <p className={cn("mt-1 text-[11px] leading-snug", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                      Concentraram sinais em {leadingPillarMovement.pillar} e {secondPillarMovement?.pillar ?? "outros pilares"} hoje.
-                    </p>
-                    <div className="mt-1.5 space-y-1">
-                      {impactedCompanies.map((company) => (
-                        <button
-                          key={company.ticker}
-                          onClick={() => navigate(`/empresa/${company.ticker}`)}
-                          className={cn(
-                            "flex w-full items-center justify-between rounded-lg px-2 py-1 text-left transition",
-                            isDarkMode ? "hover:bg-[#0F172A]" : "hover:bg-white",
-                          )}
-                        >
-                          <span className={cn("text-[12px] font-medium", isDarkMode ? "text-slate-200" : "text-slate-700")}>{company.ticker}</span>
-                          <span className={cn("text-[11px]", isDarkMode ? "text-slate-400" : "text-slate-500")}>{company.hits} sinais</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[12px] text-slate-500">Atualizado {refreshLabel} · Fontes: CVM / B3 / RI</p>
-                    {sourceFailed && <p className="text-[12px] text-amber-700">1 fonte falhou hoje; tentaremos novamente.</p>}
-                  </div>
-                  <button onClick={() => applySinglePillarFilter(focusedPillar)} className="text-[12px] font-semibold text-mint-600 hover:text-mint-700">
-                    Filtrar por pilar
-                  </button>
+              <CardFooter className="justify-between border-t border-[#F2F4F7] px-4 pt-3 pb-3.5">
+                <div>
+                  <p className="text-[12px] text-[#667085]">Atualizado {refreshLabel} · Fontes: CVM / B3 / RI</p>
+                  {sourceFailed && <p className="text-[12px] text-amber-700">1 fonte falhou hoje; tentaremos novamente.</p>}
                 </div>
+                <button onClick={() => applySinglePillarFilter(focusedPillar)} className="text-[12px] font-semibold text-[#0E9384] hover:text-[#0B7F74]">
+                  Filtrar empresas afetadas
+                </button>
               </CardFooter>
             </Card>
           </section>
-
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className={cn("text-[14px] font-semibold", isDarkMode ? "text-slate-300" : "text-slate-700")}>Blocos de apoio</h2>
-              <p className={cn("text-[12px]", isDarkMode ? "text-slate-500" : "text-slate-500")}>Apoiam a leitura, mas nao substituem o fluxo principal.</p>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              {supportCards.map((card) => (
-                <button
-                  key={card.title}
-                  onClick={card.action}
-                  className={cn(
-                    "group rounded-2xl border p-3 text-left transition-all duration-150",
-                    isDarkMode
-                      ? "border-[#1F2937] bg-[#0F172A] hover:border-[#334155] hover:shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
-                      : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-[0_2px_10px_rgba(16,24,40,0.05)]",
-                  )}
-                >
-                  <p className={cn("mb-2 text-[11px] font-medium", isDarkMode ? "text-slate-400" : "text-slate-500")}>{card.title}</p>
-                  <div className="flex items-center gap-2">
-                    {card.logoTicker && logoByTicker[card.logoTicker] ? (
-                      <Avatar className="h-7 w-7 rounded-md">
-                        <AvatarImage src={logoByTicker[card.logoTicker]} alt={card.logoTicker} className="object-cover" />
-                        <AvatarFallback className="rounded-md text-[10px]">{card.logoTicker.slice(0, 2)}</AvatarFallback>
-                      </Avatar>
-                    ) : null}
-                    <p className={cn("text-[16px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-slate-900")}>{card.value}</p>
-                  </div>
-                  <p className={cn("mt-1.5 text-[12px] leading-snug", isDarkMode ? "text-[#CBD5E1]" : "text-slate-700")}>{card.subtitle}</p>
-                  <p className={cn("mt-2.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium", card.accent)}>{card.delta}</p>
-                  <div className="mt-2.5 flex items-center justify-between">
-                    <span className="text-[12px] font-semibold text-mint-600">{card.ctaLabel}</span>
-                    <ChevronRight className={cn("h-4 w-4", isDarkMode ? "text-[#94A3B8]" : "text-slate-400")} />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {showSessionClosing && (
-            <section>
-              <Card className={cn("rounded-2xl border", isDarkMode ? "border-[#1F2937] bg-[#0B1220]" : "border-slate-200 bg-white")}>
-                <CardContent className="space-y-2 p-4">
-                  <p className={cn("text-[12px] font-semibold uppercase tracking-[0.08em]", isDarkMode ? "text-[#5EEAD4]" : "text-mint-600")}>Fechamento da sessao</p>
-                  <p className={cn("text-[14px] font-semibold", isDarkMode ? "text-[#F3F4F6]" : "text-slate-900")}>
-                    {priorityItem
-                      ? `Nas proximas horas, acompanhe ${priorityItem.ticker} e os sinais em ${leadingPillarMovement.pillar} para confirmar se a pressao persiste.`
-                      : `O pilar ${leadingPillarMovement.pillar} segue como principal frente de monitoramento nas proximas horas.`}
-                  </p>
-                  <p className={cn("text-[12px]", isDarkMode ? "text-slate-400" : "text-slate-500")}>Reveja o feed por impacto antes de encerrar sua leitura.</p>
-                </CardContent>
-              </Card>
-            </section>
-          )}
         </main>
       </div>
     </div>
@@ -1233,8 +1120,3 @@ export function Dashboard() {
 }
 
 export default Dashboard;
-
-
-
-
-
