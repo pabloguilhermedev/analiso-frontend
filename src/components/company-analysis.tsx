@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import {
  Activity,
  BarChart3,
@@ -1076,6 +1076,8 @@ function adaptV1Payload(raw: Record<string, unknown>, companyId: string, ticker:
   const trustStatus = (trust.status as Record<string, unknown> | undefined) ?? {};
   const meaning = (pillar.meaning as Record<string, unknown> | undefined) ?? {};
   const explainer = (pillar.explainer as Record<string, unknown> | undefined) ?? {};
+  const ctaRaw = pillar.cta;
+  const ctaObj = (ctaRaw && typeof ctaRaw === 'object') ? (ctaRaw as Record<string, unknown>) : {};
 
   const metricLabel = safeMeta(primaryMetric.displayLabel) || safeMeta(primaryMetric.label);
   const currentFormatted = safeMeta(currentMetric.formatted);
@@ -1165,8 +1167,8 @@ function adaptV1Payload(raw: Record<string, unknown>, companyId: string, ticker:
   watchItems,
   explainer: { text: safeMeta(explainer.text) },
   cta: {
-   title: safeMeta((pillar.cta as Record<string, unknown> | undefined)?.title),
-   button: safeMeta((pillar.cta as Record<string, unknown> | undefined)?.button),
+   title: safeMeta(ctaObj.title) || safeMeta(pillar.ctaTitle) || safeMeta(pillar.cta_title),
+   button: safeMeta(ctaObj.button) || safeMeta(ctaObj.text) || safeMeta(pillar.ctaText) || safeMeta(pillar.cta_text) || (typeof ctaRaw === 'string' ? safeMeta(ctaRaw) : ''),
   },
   } as Contextual<PillarData>;
  })
@@ -2109,9 +2111,12 @@ function evidenceSourceText(evidence: PillarEvidence | undefined, pillar: Pillar
  return trustSource || trustDate || 'dado não informado';
 }
 function ctaCopyByPillar(pillar: PillarData) {
+ const rawPillar = pillar as unknown as Record<string, unknown>;
+ const ctaRaw = rawPillar.cta;
+ const ctaObj = (ctaRaw && typeof ctaRaw === 'object') ? (ctaRaw as Record<string, unknown>) : {};
  return {
- title: safeMeta(pillar.cta?.title),
- button: safeMeta(pillar.cta?.button),
+ title: safeMeta(pillar.cta?.title) || safeMeta(ctaObj.title) || safeMeta(rawPillar.ctaTitle) || safeMeta(rawPillar.cta_title),
+ button: safeMeta(pillar.cta?.button) || safeMeta(ctaObj.button) || safeMeta(ctaObj.text) || safeMeta(rawPillar.ctaText) || safeMeta(rawPillar.cta_text) || (typeof ctaRaw === 'string' ? safeMeta(ctaRaw) : ''),
  };
 }
 
@@ -4076,7 +4081,6 @@ const changesCount = changesBySelectedWindow.length;
  </div>
  );
 }
-
 
 
 
