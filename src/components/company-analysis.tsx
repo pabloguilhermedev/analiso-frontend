@@ -41,7 +41,6 @@ type Status = 'Risco' | 'Atencao' | 'Saudavel';
 type MainTab = 'Resumo' | 'Pilares' | 'Mudancas' | 'Eventos' | 'Preço' | 'Fontes';
 type QueueFilter = 'Todas' | 'Atencao' | 'Risco';
 type WindowSize = '5a' | '10a';
-type PriceMetric = 'P/L' | 'EV/EBITDA' | 'P/VP';
 type FeedWindow = '30 dias' | '60 dias' | '90 dias';
 type ChangesFocusFilter = 'Mais relevantes' | 'Rotina' | 'Estruturais';
 type EventsFocusFilter = 'Mais relevantes' | 'Rotina' | 'Principais';
@@ -54,6 +53,40 @@ type CompanyContext = {
  companyId: string;
  ticker: string;
  name: string;
+};
+
+type PriceValuationStateChip = {
+ label: string;
+ tone?: string;
+};
+
+type PriceValuationScenario = {
+ scenario: string;
+ estimatedValue: string;
+ differenceVsCurrent: string;
+ reading: string;
+};
+
+type PriceSensitivityDriver = {
+ driver: string;
+ value: string;
+ impact: string;
+};
+
+type PriceBulletChart = {
+ conservativeMin: number | null;
+ conservativeMax: number | null;
+ baseValue: number | null;
+ optimisticMin: number | null;
+ optimisticMax: number | null;
+ currentPrice: number | null;
+ min: number | null;
+ max: number | null;
+ conservativeLabel?: string;
+ baseLabel?: string;
+ optimisticLabel?: string;
+ currentLabel?: string;
+ sourceNote?: string;
 };
 
 type Contextual<T> = T & {
@@ -421,7 +454,37 @@ const timelineEvents = [
 
 const priceData = {
  current: 'R$ 42,60',
- summary: 'Hoje o preço está mais perto de prêmio vs histórico, mas depende do ciclo e dos resultados.',
+ summary: 'Leitura de valuation por DCF com cenários conservador, base e otimista.',
+ estimatedFairValue: 'R$ 45,80',
+ differenceVsCurrent: '+7,5%',
+ valuationSummary: 'O cenário-base de valuation sugere valor estimado acima do preço atual, com alta sensibilidade a WACC e crescimento terminal.',
+ valuationStateChip: { label: 'Abaixo do preço justo estimado', tone: 'teal' },
+ valuationScenarios: [
+ { scenario: 'Conservador', estimatedValue: 'R$ 39,20', differenceVsCurrent: '-8,0%', reading: 'Valuation mais pressionado por premissas conservadoras de crescimento e margem.' },
+ { scenario: 'Base', estimatedValue: 'R$ 45,80', differenceVsCurrent: '+7,5%', reading: 'Cenário-base com premissas centrais de crescimento e reinvestimento.' },
+ { scenario: 'Otimista', estimatedValue: 'R$ 51,30', differenceVsCurrent: '+20,4%', reading: 'Cenário com execução operacional mais favorável e menor custo de capital.' },
+ ],
+ bulletChart: {
+ conservativeMin: 37.5,
+ conservativeMax: 41,
+ baseValue: 45.8,
+ optimisticMin: 49.2,
+ optimisticMax: 53.4,
+ currentPrice: 42.6,
+ min: 35,
+ max: 56,
+ conservativeLabel: 'Faixa conservadora',
+ baseLabel: 'Cenário-base',
+ optimisticLabel: 'Faixa otimista',
+ currentLabel: 'Preço atual',
+ },
+ sensitivityDrivers: [
+ { driver: 'Crescimento terminal', value: '3,0%', impact: 'Maior crescimento terminal eleva o valor estimado.' },
+ { driver: 'WACC', value: '10,8%', impact: 'WACC mais alto reduz valor presente dos fluxos futuros.' },
+ { driver: 'Margem operacional', value: '19,5%', impact: 'Margem sustentável mais alta amplia geração de caixa no cenário-base.' },
+ { driver: 'Capex / reinvestimento', value: '5,2% da receita', impact: 'Maior reinvestimento reduz FCF no curto prazo e impacta o valuation.' },
+ ],
+ multiplesSummary: 'Múltiplos são bloco de apoio para comparação relativa e não substituem o cenário-base de valuation.',
  labels: ['12x', '14x', '16x', '18x', '20x', '22x'],
  values: [4, 6, 9, 7, 5, 2],
  currentMarker: 4,
@@ -464,7 +527,15 @@ type CompanyData = {
  rows: Array<Contextual<(typeof priceData.rows)[number]>>;
  source?: string;
  updatedAt?: string;
- metricSeries?: Partial<Record<PriceMetric, { labels: string[]; values: number[]; currentMarker: number; medianMarker: number }>>;
+ metricSeries?: Record<string, { labels: string[]; values: number[]; currentMarker: number; medianMarker: number }>;
+ estimatedFairValue?: string;
+ differenceVsCurrent?: string;
+ valuationSummary?: string;
+ valuationStateChip?: PriceValuationStateChip;
+ valuationScenarios?: PriceValuationScenario[];
+ bulletChart?: PriceBulletChart;
+ sensitivityDrivers?: PriceSensitivityDriver[];
+ multiplesSummary?: string;
  };
  sourceRows: Array<Contextual<(typeof sourceRows)[number]> & { displaySource?: string; displayDoc?: string; displayStatus?: string }>;
  sourceConfidence?: { title?: string; level?: string; summary?: string };
@@ -478,7 +549,6 @@ type CompanyPreferences = {
  activeTab: MainTab;
  changesWindow: FeedWindow;
  eventsWindow: FeedWindow;
- priceMetric: PriceMetric;
  lastOpenPillar: 'Divida' | 'Caixa' | 'Margens' | 'Retorno' | 'Proventos' | null;
 };
 
@@ -826,7 +896,6 @@ function getDefaultPreferences(): CompanyPreferences {
  activeTab: 'Resumo',
  changesWindow: '90 dias',
  eventsWindow: '30 dias',
- priceMetric: 'P/L',
  lastOpenPillar: null,
  };
 }
@@ -1028,6 +1097,43 @@ function asDisplayValue(value: unknown) {
  return '';
 }
 
+function asTextValue(value: unknown) {
+ if (typeof value === 'string') return value;
+ if (typeof value === 'number') return String(value);
+ const display = asDisplayValue(value);
+ if (display) return display;
+ return '';
+}
+
+function asNumericValue(value: unknown): number | null {
+ if (typeof value === 'number' && Number.isFinite(value)) return value;
+ const text = asTextValue(value).trim();
+ if (!text) return null;
+ const normalized = text
+ .replace(/[R$\s%]/g, '')
+ .replace(/\./g, '')
+ .replace(',', '.')
+ .replace(/[^0-9.-]/g, '');
+ const parsed = Number.parseFloat(normalized);
+ return Number.isFinite(parsed) ? parsed : null;
+}
+
+function mapFairValueStateTone(stateRaw: unknown) {
+ const state = String(stateRaw ?? '').toLowerCase();
+ if (state.includes('below')) return 'teal';
+ if (state.includes('above')) return 'amber';
+ if (state.includes('over')) return 'coral';
+ return '';
+}
+
+function mapSensitivityImpactLabel(impactRaw: unknown) {
+ const impact = String(impactRaw ?? '').toLowerCase();
+ if (impact.includes('high')) return 'Impacto alto';
+ if (impact.includes('medium')) return 'Impacto médio';
+ if (impact.includes('low')) return 'Impacto baixo';
+ return safeMeta(impactRaw);
+}
+
 function adaptV1Payload(raw: Record<string, unknown>, companyId: string, ticker: string): CompanyData | null {
  const overview = (raw.overview as Record<string, unknown> | undefined) ?? {};
  const radar = (raw.radar as Record<string, unknown> | undefined) ?? {};
@@ -1036,7 +1142,7 @@ function adaptV1Payload(raw: Record<string, unknown>, companyId: string, ticker:
  const pillarsMap = (raw.pillars as Record<string, Record<string, unknown>> | undefined) ?? {};
  const changesBlock = (raw.changes as Record<string, unknown> | undefined) ?? {};
  const agenda = (raw.agenda as Record<string, unknown> | undefined) ?? {};
- const price = (raw.price as Record<string, unknown> | undefined) ?? {};
+ const fairValueAnalysis = (raw.fairValueAnalysis as Record<string, unknown> | undefined) ?? {};
  const sources = (raw.sources as Record<string, unknown> | undefined) ?? {};
 
  const radarScores: Record<PillarName, number> = {
@@ -1246,8 +1352,8 @@ function adaptV1Payload(raw: Record<string, unknown>, companyId: string, ticker:
   };
  });
 
- const distribution = (price.distributionByMetric as Record<string, Record<string, unknown>> | undefined) ?? {};
- const priceRowsRaw = Array.isArray(price.rows) ? price.rows as Array<Record<string, unknown>> : [];
+ const distribution = (fairValueAnalysis.distributionByMetric as Record<string, Record<string, unknown>> | undefined) ?? {};
+ const priceRowsRaw = Array.isArray(fairValueAnalysis.rows) ? fairValueAnalysis.rows as Array<Record<string, unknown>> : [];
  const priceRows = priceRowsRaw.map((row) => ({
   companyId,
   ticker,
@@ -1257,6 +1363,75 @@ function adaptV1Payload(raw: Record<string, unknown>, companyId: string, ticker:
   histórical: String(row.histórical ?? ''),
   insight: String(row.insight ?? ''),
  }));
+ const fairMeta = (fairValueAnalysis.meta as Record<string, unknown> | undefined) ?? {};
+ const fairCards = (fairValueAnalysis.cards as Record<string, unknown> | undefined) ?? {};
+ const fairCurrentCard = (fairCards.currentPrice as Record<string, unknown> | undefined) ?? {};
+ const fairValueCard = (fairCards.fairValue as Record<string, unknown> | undefined) ?? {};
+ const fairGapCard = (fairCards.gap as Record<string, unknown> | undefined) ?? {};
+ const valuationState = {
+  label: safeMeta(fairValueAnalysis.label),
+  tone: mapFairValueStateTone(fairValueAnalysis.state),
+ };
+ const scenariosRaw = Array.isArray(fairValueAnalysis.scenarios)
+ ? fairValueAnalysis.scenarios as Array<Record<string, unknown>>
+ : [];
+ const fairSensitivity = (fairValueAnalysis.sensitivity as Record<string, unknown> | undefined) ?? {};
+ const sensitivityRaw = Array.isArray(fairSensitivity.drivers)
+ ? fairSensitivity.drivers as Array<Record<string, unknown>>
+ : [];
+ const fairChart = (fairValueAnalysis.chart as Record<string, unknown> | undefined) ?? {};
+ const fairRanges = (fairChart.ranges as Record<string, unknown> | undefined) ?? {};
+ const fairConservativeRange = (fairRanges.conservative as Record<string, unknown> | undefined) ?? {};
+ const fairBaseRange = (fairRanges.base as Record<string, unknown> | undefined) ?? {};
+ const fairOptimisticRange = (fairRanges.optimistic as Record<string, unknown> | undefined) ?? {};
+ const fairCurrentChart = (fairChart.currentPrice as Record<string, unknown> | undefined) ?? {};
+ const bulletRaw = {
+  conservative: fairConservativeRange,
+  base: fairBaseRange,
+  optimistic: fairOptimisticRange,
+  current: fairCurrentChart,
+  min: fairConservativeRange.min,
+  max: fairOptimisticRange.max,
+ };
+ const conservativeRaw = (bulletRaw.conservative as Record<string, unknown> | undefined) ?? {};
+ const baseRaw = (bulletRaw.base as Record<string, unknown> | undefined) ?? {};
+ const optimisticRaw = (bulletRaw.optimistic as Record<string, unknown> | undefined) ?? {};
+ const currentRaw = (bulletRaw.current as Record<string, unknown> | undefined) ?? {};
+ const inferredMin = [
+ asNumericValue(conservativeRaw.min),
+ asNumericValue(conservativeRaw.max),
+ asNumericValue(baseRaw.fairValue ?? baseRaw.value),
+ asNumericValue(optimisticRaw.min),
+ asNumericValue(optimisticRaw.max),
+ asNumericValue(currentRaw.value),
+ asNumericValue(fairCurrentCard.value),
+ ].filter((value): value is number => value != null && Number.isFinite(value));
+ const bulletChart: PriceBulletChart = {
+ conservativeMin: asNumericValue(conservativeRaw.min),
+ conservativeMax: asNumericValue(conservativeRaw.max),
+ baseValue: asNumericValue(baseRaw.fairValue ?? baseRaw.value),
+ optimisticMin: asNumericValue(optimisticRaw.min),
+ optimisticMax: asNumericValue(optimisticRaw.max),
+ currentPrice: asNumericValue(currentRaw.value) ?? asNumericValue(fairCurrentCard.value),
+ min: asNumericValue(bulletRaw.min) ?? (inferredMin.length > 0 ? Math.min(...inferredMin) : null),
+ max: asNumericValue(bulletRaw.max) ?? (inferredMin.length > 0 ? Math.max(...inferredMin) : null),
+ conservativeLabel: safeMeta(conservativeRaw.label) || 'Faixa conservadora',
+ baseLabel: safeMeta(baseRaw.label) || 'Cenário-base',
+ optimisticLabel: safeMeta(optimisticRaw.label) || 'Faixa otimista',
+ currentLabel: safeMeta(currentRaw.label) || 'Preço atual',
+ sourceNote: safeMeta(bulletRaw.sourceNote),
+ };
+ const valuationScenarios = scenariosRaw.map((scenario) => ({
+ scenario: safeMeta(scenario.label),
+ estimatedValue: asTextValue(scenario.displayEstimatedValue ?? scenario.estimatedValue),
+ differenceVsCurrent: asTextValue(scenario.displayGapVsCurrent ?? scenario.gapVsCurrentPct),
+ reading: asTextValue(scenario.reading),
+ })).filter((scenario) => scenario.scenario || scenario.estimatedValue || scenario.differenceVsCurrent || scenario.reading);
+ const sensitivityDrivers = sensitivityRaw.map((driver) => ({
+ driver: safeMeta(driver.label),
+ value: mapSensitivityImpactLabel(driver.impact),
+ impact: mapSensitivityImpactLabel(driver.impact),
+ })).filter((driver) => driver.driver || driver.value || driver.impact);
 
  const sourceRowsRaw = Array.isArray(sources.rows) ? sources.rows as Array<Record<string, unknown>> : [];
  const sourceRows = sourceRowsRaw.map((row) => {
@@ -1343,15 +1518,41 @@ function adaptV1Payload(raw: Record<string, unknown>, companyId: string, ticker:
  priceData: {
   companyId,
   ticker,
-  current: asDisplayValue(price.currentPrice),
-  summary: String(price.summary ?? ''),
+  current: asTextValue(
+   fairCurrentCard.displayValue
+   ?? fairCurrentChart.displayValue
+  ),
+  summary: String(fairValueAnalysis.summary ?? fairValueAnalysis.headline ?? ''),
   labels: [],
   values: [],
   currentMarker: 0,
   medianMarker: 0,
   rows: priceRows as CompanyData['priceData']['rows'],
-  source: safeMeta(price.sourceDisplay),
-  updatedAt: asDisplayValue(price.updatedAt),
+  source: safeMeta(fairMeta.source),
+  updatedAt: asTextValue(fairMeta.updatedAt),
+  estimatedFairValue: asTextValue(
+   fairValueCard.displayValue
+   ?? fairBaseRange.displayFairValue
+  ),
+  differenceVsCurrent: asTextValue(
+   fairGapCard.displayValue
+  ),
+  valuationSummary: asTextValue(
+   fairValueAnalysis.whyItMatters
+   ?? fairValueAnalysis.meaning
+  ),
+  valuationStateChip: {
+   label: safeMeta(valuationState.label),
+   tone: safeMeta(valuationState.tone),
+  },
+  valuationScenarios,
+  bulletChart,
+  sensitivityDrivers,
+  multiplesSummary: asTextValue(
+   fairSensitivity.summary
+   ?? fairValueAnalysis.takeaway
+   ?? fairValueAnalysis.summary
+  ),
   metricSeries: Object.fromEntries(Object.entries(distribution).map(([metric, dist]) => {
    const labels = Array.isArray(dist.labels) ? dist.labels as string[] : [];
    const values = Array.isArray(dist.values) ? dist.values as number[] : [];
@@ -2163,13 +2364,6 @@ function median(values: number[]) {
  return sorted[middle];
 }
 
-function parseMultipleValue(value?: string | null) {
- if (!value) return null;
- const cleaned = value.replace(/\s+/g, '').replace('x', '').replace(',', '.');
- const parsed = Number.parseFloat(cleaned);
- return Number.isFinite(parsed) ? parsed : null;
-}
-
 function SkeletonBlock({ className }: { className: string }) {
  return <div className={cx('rounded-md bg-[#F3F4F6] skeleton-shimmer', className)} />;
 }
@@ -2191,7 +2385,6 @@ export function CompanyAnalysis() {
  const [showScoreInfo, setShowScoreInfo] = useState(false);
  const [showHeaderUpdateDetails, setShowHeaderUpdateDetails] = useState(false);
  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
- const [selectedPriceMetric, setSelectedPriceMetric] = useState<PriceMetric>('P/L');
  const [changesWindow, setChangesWindow] = useState<FeedWindow>('90 dias');
  const [changesFocus, setChangesFocus] = useState<ChangesFocusFilter>('Mais relevantes');
  const [changesPillarFilter, setChangesPillarFilter] = useState<ChangePillarTag | 'Todos'>('Todos');
@@ -2241,7 +2434,6 @@ export function CompanyAnalysis() {
  setLoadingTab(true);
  const requestedTab = normalizeMainTabParam(searchParams.get('tab'));
  setActiveTab(requestedTab ?? 'Resumo');
- setSelectedPriceMetric(prefs.priceMetric);
  setChangesWindow(prefs.changesWindow);
  setChangesFocus('Mais relevantes');
  setChangesPillarFilter('Todos');
@@ -2349,56 +2541,46 @@ export function CompanyAnalysis() {
  const mostCriticalPillar = [...mapPillarEntries].sort((a, b) => a.score - b.score)[0];
  const strongestPillar = [...mapPillarEntries].sort((a, b) => b.score - a.score)[0];
  const actionsDisabled = showSkeleton;
- const availablePriceMetrics = (Object.keys(activeData?.priceData.metricSeries ?? {}) as PriceMetric[]);
-const activePriceSeries =
- (activeData?.priceData.metricSeries && activeData.priceData.metricSeries[selectedPriceMetric]) ||
- (activeData?.priceData.metricSeries && availablePriceMetrics.length > 0 ? activeData.priceData.metricSeries[availablePriceMetrics[0]] : undefined) ||
- null;
-const activePriceRows = (activeData?.priceData.rows ?? []).filter((row) => row.companyId === companyContext.companyId && row.metric === selectedPriceMetric);
-const activePriceRow = activePriceRows[0] ?? (activeData?.priceData.rows ?? []).find((row) => row.companyId === companyContext.companyId);
- const currentMultipleValue = parseMultipleValue(activePriceRow?.current);
- const históricalMultipleValue = parseMultipleValue(activePriceRow?.histórical);
- const sectorMultipleValue = parseMultipleValue(activePriceRow?.sector);
- const premiumVsHistorical = currentMultipleValue != null && históricalMultipleValue != null && históricalMultipleValue > 0
- ? ((currentMultipleValue / históricalMultipleValue) - 1) * 100
- : null;
- const premiumVsSector = currentMultipleValue != null && sectorMultipleValue != null && sectorMultipleValue > 0
- ? ((currentMultipleValue / sectorMultipleValue) - 1) * 100
- : null;
- const priceSummaryLine = (activeData?.priceData.summary ?? '').trim();
- const priceContextPosition = (() => {
- if (premiumVsHistorical == null) return 'Sem base suficiente para classificar a faixa histórica agora.';
- if (premiumVsHistorical <= -15) return 'Hoje o mercado está negociando com desconto relevante versus o histórico recente.';
- if (premiumVsHistorical < -5) return 'Hoje o mercado está negociando com desconto moderado versus o histórico recente.';
- if (premiumVsHistorical <= 5) return 'Hoje o mercado está próximo da faixa histórica recente.';
- if (premiumVsHistorical <= 15) return 'Hoje o mercado está pagando um prêmio moderado sobre o histórico recente.';
- return 'O múltiplo está acima do histórico e já exige continuidade de qualidade e crescimento para se sustentar.';
- })();
- const priceReadingLine = (() => {
- if (!activePriceRow) return 'Sem dados suficientes para leitura de valuation neste momento.';
- if (históricalMultipleValue == null) return `O ativo negocia em ${activePriceRow.current} no indicador ${selectedPriceMetric}.`;
- if (currentMultipleValue != null && históricalMultipleValue != null && currentMultipleValue >= históricalMultipleValue) {
-  return `O ativo negocia acima da sua mediana histórica em ${selectedPriceMetric}.`;
- }
- return `O ativo negocia abaixo da sua mediana histórica em ${selectedPriceMetric}.`;
- })();
- const priceContextLine = (() => {
- if (!activePriceRow) return 'Sem comparativo histórico e setorial para qualificar a leitura.';
- if (históricalMultipleValue == null || sectorMultipleValue == null) return `Hoje está em ${activePriceRow.current} em ${selectedPriceMetric}.`;
- const vsHistorical = currentMultipleValue != null && históricalMultipleValue != null
- ? (currentMultipleValue >= históricalMultipleValue ? 'acima' : 'abaixo')
- : 'próximo de';
- const vsSector = currentMultipleValue != null && sectorMultipleValue != null
- ? (currentMultipleValue >= sectorMultipleValue ? 'acima' : 'abaixo')
- : 'próximo de';
- return `Hoje está em ${activePriceRow.current}, ${vsHistorical} da mediana de 5 anos (${activePriceRow.histórical}) e também ${vsSector} do setor (${activePriceRow.sector}). Isso da contexto para a leitura atual, mas não significa automaticamente que o ativo estejá caro ou barato.`;
- })();
- const pricePremiumProfile = (() => {
- if (premiumVsHistorical == null && premiumVsSector == null) return 'Sem base suficiente para classificar prêmio ou desconto.';
- if ((premiumVsHistorical ?? 0) >= 0 && (premiumVsSector ?? 0) >= 0) return 'Negocia com prêmio sobre histórico e setor.';
- if ((premiumVsHistorical ?? 0) <= 0 && (premiumVsSector ?? 0) <= 0) return 'Negocia com desconto versus histórico e setor.';
- return 'Leitura mista entre histórico e setor.';
- })();
+ const companyPriceRows = (activeData?.priceData.rows ?? []).filter((row) => row.companyId === companyContext.companyId);
+ const valuationStateChipLabel = safeMeta(activeData?.priceData.valuationStateChip?.label);
+ const valuationStateChipToneRaw = safeMeta(activeData?.priceData.valuationStateChip?.tone).toLowerCase();
+ const valuationStateChipTone = valuationStateChipToneRaw.includes('coral')
+ ? 'border-[#F6C9BF] bg-[#FFF4F1] text-[#B54834]'
+ : valuationStateChipToneRaw.includes('amber')
+ ? 'border-[#F6DEA9] bg-[#FFF9ED] text-[#9A6A0F]'
+ : valuationStateChipToneRaw.includes('teal')
+ ? 'border-[#99F6E4] bg-[#F0FDFA] text-[#0F766E]'
+ : 'border-[#DDE3EA] bg-[#F8FAFC] text-[#475569]';
+ const valuationSummaryLine = (activeData?.priceData.valuationSummary ?? activeData?.priceData.summary ?? '').trim();
+ const valuationScenarios = (activeData?.priceData.valuationScenarios ?? []).filter((scenario) => scenario.scenario || scenario.estimatedValue || scenario.differenceVsCurrent || scenario.reading);
+ const sensitivityDrivers = (activeData?.priceData.sensitivityDrivers ?? []).filter((driver) => driver.driver || driver.value || driver.impact);
+ const valuationBullet = activeData?.priceData.bulletChart ?? null;
+ const bulletPoints = [
+ valuationBullet?.min,
+ valuationBullet?.max,
+ valuationBullet?.conservativeMin,
+ valuationBullet?.conservativeMax,
+ valuationBullet?.baseValue,
+ valuationBullet?.optimisticMin,
+ valuationBullet?.optimisticMax,
+ valuationBullet?.currentPrice,
+ ].filter((value): value is number => value != null && Number.isFinite(value));
+ const bulletMin = valuationBullet?.min != null ? valuationBullet.min : (bulletPoints.length > 0 ? Math.min(...bulletPoints) : null);
+ const bulletMax = valuationBullet?.max != null ? valuationBullet.max : (bulletPoints.length > 0 ? Math.max(...bulletPoints) : null);
+ const hasBulletDomain = bulletMin != null && bulletMax != null && bulletMax > bulletMin;
+ const toBulletPercent = (value: number | null | undefined) => {
+ if (!hasBulletDomain || value == null) return null;
+ const pct = ((value - bulletMin) / (bulletMax - bulletMin)) * 100;
+ return Math.min(100, Math.max(0, pct));
+ };
+ const conservativeLeft = toBulletPercent(valuationBullet?.conservativeMin ?? null);
+ const conservativeRight = toBulletPercent(valuationBullet?.conservativeMax ?? null);
+ const optimisticLeft = toBulletPercent(valuationBullet?.optimisticMin ?? null);
+ const optimisticRight = toBulletPercent(valuationBullet?.optimisticMax ?? null);
+ const baseMarker = toBulletPercent(valuationBullet?.baseValue ?? null);
+ const currentMarker = toBulletPercent(valuationBullet?.currentPrice ?? null);
+ const hasConservativeRange = conservativeLeft != null && conservativeRight != null && conservativeRight >= conservativeLeft;
+ const hasOptimisticRange = optimisticLeft != null && optimisticRight != null && optimisticRight >= optimisticLeft;
  const companySourceRows = (activeData?.sourceRows ?? []).filter((row) => row.companyId === companyContext.companyId);
  const sourceRowsWithRelevance = companySourceRows.map((row) => {
  const displaySource = (row as { displaySource?: string }).displaySource ?? row.source;
@@ -2929,14 +3111,6 @@ const changesCount = changesBySelectedWindow.length;
  }, [actionError]);
 
  useEffect(() => {
- if (!activeData?.priceData.metricSeries) return;
- const metrics = Object.keys(activeData.priceData.metricSeries) as PriceMetric[];
- if (metrics.length > 0 && !metrics.includes(selectedPriceMetric)) {
- setSelectedPriceMetric(metrics[0]);
- }
- }, [activeData, selectedPriceMetric]);
-
- useEffect(() => {
  const openPillar =
  (Object.entries(expandedPillars).find(([, isOpen]) => isOpen)?.[0] as Exclude<CompanyPreferences['lastOpenPillar'], null> | undefined) ??
  null;
@@ -2944,10 +3118,9 @@ const changesCount = changesBySelectedWindow.length;
  activeTab,
  changesWindow,
  eventsWindow,
- priceMetric: selectedPriceMetric,
  lastOpenPillar: openPillar,
  });
- }, [activeTab, changesWindow, companyContext.companyId, eventsWindow, expandedPillars, selectedPriceMetric]);
+ }, [activeTab, changesWindow, companyContext.companyId, eventsWindow, expandedPillars]);
 
  return (
  <div className="h-screen overflow-hidden bg-[#F7F8FA] font-['Plus_Jakarta_Sans','DM_Sans',system-ui,sans-serif] text-[#111827]">
@@ -3871,106 +4044,114 @@ const changesCount = changesBySelectedWindow.length;
 
  {activeTab === 'Preço' && (
  <article className="rounded-xl border border-[#E8EAED] bg-white p-5">
- <div className="flex items-center justify-between">
- <h2 className="text-[15px] font-semibold text-[#111827]">Preço em contexto</h2>
- <div className="inline-flex rounded-full bg-[#F9FAFB] p-1">
- {(['P/L', 'EV/EBITDA', 'P/VP'] as PriceMetric[]).map((metric) => {
- const hasMetric = availablePriceMetrics.includes(metric);
- return (
- <button
- key={metric}
- onClick={() => hasMetric && setSelectedPriceMetric(metric)}
- disabled={!hasMetric}
- className={cx(
- 'rounded-full px-2.5 py-1 text-[11px]',
- selectedPriceMetric === metric ? 'border border-[#99F6E4] bg-[#F0FDFA] font-semibold text-[#0E9384]' : 'text-[#6B7280]',
- !hasMetric ? 'cursor-not-allowed opacity-40' : ''
+ <div className="flex flex-wrap items-start justify-between gap-2">
+ <div>
+ <h2 className="text-[15px] font-semibold text-[#111827]">Preço vs valor estimado</h2>
+ <p className="mt-1 text-[13px] text-[#64748B]">Leitura por cenário-base de valuation (DCF). Não é recomendação de compra ou venda.</p>
+ </div>
+ {valuationStateChipLabel && (
+ <span className={cx('rounded-full border px-2.5 py-1 text-[11px] font-semibold', valuationStateChipTone)}>{valuationStateChipLabel}</span>
  )}
- >
- {metric}
- </button>
- );
- })}
  </div>
- </div>
- <div className="mt-2 space-y-1.5">
- <p className="text-[12px] font-semibold uppercase tracking-wide text-[#64748B]">Leitura atual</p>
- <p className="text-[14px] font-medium text-[#111827]">{priceReadingLine}</p>
- <p className="text-[12px] font-semibold uppercase tracking-wide text-[#64748B]">Contexto</p>
- <p className="text-[13px] text-[#6B7280]">{priceContextLine}</p>
- {priceSummaryLine && <p className="text-[13px] text-[#475569]">{priceSummaryLine}</p>}
- </div>
- <p className="mt-1 text-[11px] text-[#9CA3AF]">Fonte: {safeMeta(activeData?.priceData.source)} Atualizado em: {safeMeta(activeData?.priceData.updatedAt)}</p>
- <p className="mt-1 text-[11px] text-[#9CA3AF]">Preço nominal: {safeMeta(activeData?.priceData.current)} (apoio de contexto, não sinal principal).</p>
+ <p className="mt-2 text-[11px] text-[#9CA3AF]">Fonte: {safeMeta(activeData?.priceData.source)} | Atualizado em: {safeMeta(activeData?.priceData.updatedAt)}</p>
 
  <div className="mt-4 grid gap-2 sm:grid-cols-3">
  <div className="rounded-lg border border-[#E5EAF1] bg-[#F8FAFD] px-3 py-2">
- <p className="text-[11px] text-[#64748B]">Hoje ({selectedPriceMetric})</p>
- <p className="text-[15px] font-semibold text-[#1E293B]">{activePriceRow?.current ?? '--'}</p>
+ <p className="text-[11px] text-[#64748B]">Preço atual</p>
+ <p className="text-[15px] font-semibold text-[#1E293B]">{safeMeta(activeData?.priceData.current) || '--'}</p>
  </div>
  <div className="rounded-lg border border-[#E5EAF1] bg-[#F8FAFD] px-3 py-2">
- <p className="text-[11px] text-[#64748B]">Mediana 5a</p>
- <p className="text-[15px] font-semibold text-[#1E293B]">{activePriceRow?.histórical ?? '--'}</p>
+ <p className="text-[11px] text-[#64748B]">Preço justo estimado</p>
+ <p className="text-[15px] font-semibold text-[#1E293B]">{safeMeta(activeData?.priceData.estimatedFairValue) || '--'}</p>
  </div>
  <div className="rounded-lg border border-[#E5EAF1] bg-[#F8FAFD] px-3 py-2">
- <p className="text-[11px] text-[#64748B]">Setor</p>
- <p className="text-[15px] font-semibold text-[#1E293B]">{activePriceRow?.sector ?? '--'}</p>
+ <p className="text-[11px] text-[#64748B]">Diferença vs preço atual</p>
+ <p className="text-[15px] font-semibold text-[#1E293B]">{safeMeta(activeData?.priceData.differenceVsCurrent) || '--'}</p>
  </div>
  </div>
 
- <div className="mt-4 rounded-lg border border-[#E5EAF1] bg-[#FCFDFE] p-4">
- {!activePriceSeries && (
- <div className="py-3 text-[12px] text-[#9CA3AF]">
- Ainda não temos dados suficientes para este indicador. Última tentativa: {safeMeta(activeData?.priceData.updatedAt)}. Fonte esperada: CVM/RI
- </div>
+ {valuationSummaryLine && <p className="mt-3 text-[13px] text-[#475569]">{valuationSummaryLine}</p>}
+
+ <section className="mt-4 rounded-lg border border-[#E5EAF1] bg-[#FCFDFE] p-4">
+ <p className="text-[12px] font-semibold uppercase tracking-wide text-[#64748B]">Bullet chart de valuation</p>
+ {!hasBulletDomain && (
+ <div className="py-3 text-[12px] text-[#9CA3AF]">Sem base suficiente para exibir a faixa de cenários neste momento.</div>
  )}
- <div className="flex h-28 items-end gap-2">
- {(activePriceSeries?.values ?? []).map((value, index) => (
- <div key={activePriceSeries?.labels[index]} className="flex flex-1 flex-col items-center gap-1">
- <div className={cx('w-full rounded-md', index === activePriceSeries?.currentMarker ? 'bg-[#6B7F9E]' : 'bg-[#D7DFEA]')} style={{ height: `${value * 8}px` }} />
- <span className="text-[11px] text-[#9CA3AF]">{activePriceSeries?.labels[index]}</span>
+ {hasBulletDomain && (
+ <>
+ <div className="relative mt-3 h-6 rounded-full bg-[#EEF2F6]">
+ {hasConservativeRange && (
+ <div
+ className="absolute top-1/2 h-3 -translate-y-1/2 rounded-full bg-[#CFF6EF]"
+ style={{ left: `${conservativeLeft}%`, width: `${Math.max((conservativeRight ?? 0) - conservativeLeft, 0)}%` }}
+ />
+ )}
+ {hasOptimisticRange && (
+ <div
+ className="absolute top-1/2 h-3 -translate-y-1/2 rounded-full bg-[#FDE9BF]"
+ style={{ left: `${optimisticLeft}%`, width: `${Math.max((optimisticRight ?? 0) - optimisticLeft, 0)}%` }}
+ />
+ )}
+ {baseMarker != null && <div className="absolute top-0 h-6 w-[2px] bg-[#0F766E]" style={{ left: `${baseMarker}%` }} />}
+ {currentMarker != null && (
+ <div className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#334155] bg-white" style={{ left: `${currentMarker}%` }} />
+ )}
+ </div>
+ <div className="mt-3 grid gap-2 text-[11px] text-[#5B6472] sm:grid-cols-2">
+ <p>{safeMeta(valuationBullet?.conservativeLabel) || 'Faixa conservadora'}</p>
+ <p>{safeMeta(valuationBullet?.baseLabel) || 'Cenário-base'}</p>
+ <p>{safeMeta(valuationBullet?.optimisticLabel) || 'Faixa otimista'}</p>
+ <p>{safeMeta(valuationBullet?.currentLabel) || 'Preço atual'}: {safeMeta(activeData?.priceData.current) || '--'}</p>
+ </div>
+ </>
+ )}
+ </section>
+
+ <section className="mt-5 rounded-lg border border-[#EEF2F6] bg-[#FBFCFE] p-3">
+ <p className="mb-2 text-[11px] uppercase tracking-wide text-[#94A3B8]">Cenários do valuation</p>
+ <div className="grid grid-cols-4 border-b border-[#EEF2F6] pb-2 text-[11px] font-semibold text-[#94A3B8]">
+ <span>Cenário</span>
+ <span>Valor estimado</span>
+ <span>Diferença vs preço atual</span>
+ <span>Leitura</span>
+ </div>
+ {valuationScenarios.map((scenario, index) => (
+ <div key={`${scenario.scenario}-${index}`} className="grid grid-cols-4 border-b border-[#EEF2F6] py-2.5 text-[12px] text-[#334155]">
+ <span className="font-medium">{scenario.scenario || '--'}</span>
+ <span>{scenario.estimatedValue || '--'}</span>
+ <span>{scenario.differenceVsCurrent || '--'}</span>
+ <span className="text-[#64748B]">{scenario.reading || '--'}</span>
  </div>
  ))}
- </div>
- <div className="relative mt-3 h-6">
- <div className="absolute inset-x-0 top-3 h-px bg-[#E5E7EB]" />
- <div className="absolute top-0 h-6 w-px bg-[#475569]" style={{ left: `${(((activePriceSeries?.currentMarker ?? 0) / Math.max((activePriceSeries?.labels.length ?? 1) - 1, 1)) * 100)}%` }} />
- <div className="absolute top-0 h-6 w-px border-l-2 border-[#475569]" style={{ left: `${(((activePriceSeries?.medianMarker ?? 0) / Math.max((activePriceSeries?.labels.length ?? 1) - 1, 1)) * 100)}%` }} />
- <span
- className="absolute top-0 -translate-x-1/2 rounded bg-[#EEF2F7] px-1.5 py-0.5 text-[10px] font-medium text-[#475569]"
- style={{ left: `${(((activePriceSeries?.medianMarker ?? 0) / Math.max((activePriceSeries?.labels.length ?? 1) - 1, 1)) * 100)}%` }}
- >
- Mediana
- </span>
- </div>
- <div className="mt-1 flex items-center justify-between text-[10px]">
- <span className="text-[#475569]">Hoje ({activePriceRow?.current ?? '--'})</span>
- <span className="text-[#6B7280]">Mediana 5a ({activePriceRow?.histórical ?? '--'})</span>
- </div>
- <p className="mt-2 text-[12px] text-[#6B7280]">
- Distribuicao histórica do múltiplo: este gráfico mostra frequência por faixa, não sinal de compra ou venda.
- </p>
- {(premiumVsHistorical != null || premiumVsSector != null) && (
- <p className="mt-1 text-[12px] text-[#475569]">
- Takeaway rápido:
- {premiumVsHistorical != null ? ` ${selectedPriceMetric} hoje está ${premiumVsHistorical >= 0 ? `${premiumVsHistorical.toFixed(1)}% acima` : `${Math.abs(premiumVsHistorical).toFixed(1)}% abaixo`} da mediana histórica.` : ''}
- {premiumVsSector != null ? ` Em relação ao setor, está ${premiumVsSector >= 0 ? `${premiumVsSector.toFixed(1)}% acima` : `${Math.abs(premiumVsSector).toFixed(1)}% abaixo`}.` : ''}
- </p>
- )}
- <p className="mt-1 text-[12px] font-medium text-[#475569]">{priceContextPosition} {pricePremiumProfile}</p>
- </div>
+ {valuationScenarios.length === 0 && <div className="py-3 text-[12px] text-[#9CA3AF]">Sem cenários de valuation disponíveis.</div>}
+ </section>
 
- <div className="mt-5 rounded-lg border border-[#EEF2F6] bg-[#FBFCFE] p-3">
- <p className="mb-2 text-[11px] uppercase tracking-wide text-[#94A3B8]">Comparação resumida</p>
+ <section className="mt-4 rounded-lg border border-[#E5EAF1] bg-white p-3">
+ <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748B]">Sensibilidade do valuation</p>
+ <p className="mt-1 text-[12px] text-[#6B7280]">Drivers principais: crescimento terminal, WACC, margem operacional e capex/reinvestimento.</p>
+ <div className="mt-3 grid gap-2 sm:grid-cols-2">
+ {sensitivityDrivers.map((driver, index) => (
+ <div key={`${driver.driver}-${index}`} className="rounded-md border border-[#E6EAF0] bg-[#FBFCFE] p-2.5">
+ <p className="text-[12px] font-semibold text-[#0F172A]">{driver.driver || '--'}</p>
+ <p className="mt-1 text-[12px] text-[#475569]">{driver.value || '--'}</p>
+ <p className="mt-1 text-[11px] text-[#6B7280]">{driver.impact || '--'}</p>
+ </div>
+ ))}
+ {sensitivityDrivers.length === 0 && <p className="text-[12px] text-[#9CA3AF]">Sem drivers de sensibilidade disponíveis.</p>}
+ </div>
+ </section>
+
+ <section className="mt-5 rounded-lg border border-[#EEF2F6] bg-[#FBFCFE] p-3">
+ <p className="mb-2 text-[11px] uppercase tracking-wide text-[#94A3B8]">Múltiplos de apoio</p>
  <div className="grid grid-cols-5 border-b border-[#EEF2F6] pb-2 text-[11px] font-semibold text-[#94A3B8]">
  <span>Métrica</span>
  <span>Atual</span>
  <span>Setor</span>
  <span>Histórico 5a</span>
- <span>Interpretação</span>
+ <span>Leitura</span>
  </div>
- {(activeData?.priceData.rows ?? []).filter((row) => row.companyId === companyContext.companyId && row.metric === selectedPriceMetric).map((row) => (
- <div key={row.metric} className="grid grid-cols-5 border-b border-[#EEF2F6] py-2.5 text-[12px] text-[#334155]">
+ {companyPriceRows.map((row) => (
+ <div key={`${row.metric}-${row.companyId}`} className="grid grid-cols-5 border-b border-[#EEF2F6] py-2.5 text-[12px] text-[#334155]">
  <span className="font-medium">{row.metric}</span>
  <span>{row.current}</span>
  <span>{row.sector}</span>
@@ -3978,11 +4159,9 @@ const changesCount = changesBySelectedWindow.length;
  <span className="text-[#64748B]">{row.insight}</span>
  </div>
  ))}
- {((activeData?.priceData.rows ?? []).filter((row) => row.companyId === companyContext.companyId && row.metric === selectedPriceMetric).length === 0) && (
- <div className="py-3 text-[12px] text-[#9CA3AF]">Sem dados para este indicador.</div>
- )}
- </div>
- <p className="mt-4 text-[12px] italic text-[#6B7280]">Multiplicadores ajudam a comparar contexto de valuation, mas não são recomendação de compra ou venda.</p>
+ {companyPriceRows.length === 0 && <div className="py-3 text-[12px] text-[#9CA3AF]">Sem múltiplos de apoio disponíveis.</div>}
+ <p className="mt-3 text-[12px] italic text-[#6B7280]">{safeMeta(activeData?.priceData.multiplesSummary) || 'Múltiplos ajudam a contextualizar a leitura de valuation, sem substituir o cenário-base de DCF.'}</p>
+ </section>
  </article>
  )}
 
